@@ -23,6 +23,7 @@ from os import listdir
 from os.path import isfile, join
 from PIL import Image
 import pickle
+import cv2
 
 parser = argparse.ArgumentParser(description='Process args.')
 parser.add_argument('-f', '--load-file', type=str, default=None,
@@ -302,10 +303,8 @@ with torch.inference_mode():
                 img_hat_em = torchvision.transforms.Grayscale()(img_hat_em)
                 # Mask the image
                 masked_output = test_strip_img * torch.unsqueeze(img_hat_em, 0)
-                imgplot = plt.imshow(torch.permute(test_strip_img[0], (1, 2, 0)), cmap='Greys',  interpolation='nearest')
-                plt.show()
-                imgplot = plt.imshow(torch.permute(masked_output[0], (1, 2, 0)), cmap='Greys',  interpolation='nearest')
-                plt.show()
+                cv2.imshow('frame', torch.permute(test_strip_img[0], (1, 2, 0)).numpy())
+                cv2.imshow('frame2', torch.permute(masked_output[0], (1, 2, 0)).numpy())
                 # Sum the result over the y dimension.
                 masked_output = torch.squeeze(masked_output)
                 masked_output = torch.sum(masked_output, axis=-2)
@@ -315,13 +314,11 @@ with torch.inference_mode():
                 input_img_masked_sum = torch.squeeze(input_img_masked_sum)
                 print(input_img_masked_sum.shape)
                 input_img_masked_sum = torch.sum(input_img_masked_sum, axis=-2)
-                print(input_img_masked_sum.shape)
-                #imgplot = plt.imshow(torch.permute(img_hat_em, (1, 2, 0)), cmap='Greys',  interpolation='nearest')
-                imgplot = plt.imshow(torch.permute(img_hat_em, (1, 2, 0)), interpolation='nearest')
-                plt.show()
+                cv2.imshow('frame3', torch.permute(img_hat_em, (1, 2, 0)).numpy())
                 plt.plot(masked_output)
                 plt.plot(input_img_masked_sum)
                 plt.show()
+                cv2.waitKey()
                 break
 
             #save_image(img_grid, './images/img_p{0}_idx{1}.png'.format('{0:06.3f}'.format(img_idx), str(em_step).zfill(12)))
