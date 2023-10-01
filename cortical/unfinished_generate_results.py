@@ -268,6 +268,7 @@ with torch.inference_mode():
         # Get the path of the test strip
         illusion_path, illusion_filename = img_file.rsplit('/', 1)
         test_strip_file = illusion_path + '/test_strips/' + illusion_filename.split('.')[0] + '_teststrip.png'
+        print('Opening image {0} with test strip file {1}'.format(img_file, test_strip_file))
         img = Image.open(img_file)
         img = image_transform(img)[None, ...]
         try:
@@ -277,16 +278,12 @@ with torch.inference_mode():
         except:
             print('Could not find {0}, skipping'.format(test_strip_file))
             continue
+        # Make sure it is binary.
         assert np.sum(((test_strip_img > 0) * (test_strip_img < 1)).astype(np.int)) <= 0
         test_strip_img = image_transform(test_strip_img)[None, ...]
         # Re-binarize after the resize.
-        print(type(test_strip_img))
         test_strip_img = (test_strip_img > 0.5).float()
-        print(type(test_strip_img))
         print('Test strip stats: ', torch.mean(test_strip_img), torch.min(test_strip_img), torch.max(test_strip_img))
-        # Make sure it is binary.
-        print(test_strip_img, test_strip_img.shape)
-        print(torch.sum((test_strip_img > 0) * (test_strip_img < 1)))
         # Reset grid
         grid.reset()
         for em_step, (img_hat_em, em_field) in enumerate(model(img)):
@@ -301,25 +298,29 @@ with torch.inference_mode():
             img_grid = torchvision.transforms.functional.resize(img_grid, size=(img_grid.shape[1] * 4, img_grid.shape[2] * 4), interpolation=torchvision.transforms.InterpolationMode.NEAREST)
 
             if(em_step >= argmax_step):
-                print('Preparing the images:')
-                print(test_strip_img, test_strip_img.shape, img_hat_em.shape)
                 # Converting to grayscale
                 img_hat_em = torchvision.transforms.Grayscale()(img_hat_em)
                 # Mask the image
                 masked_output = test_strip_img * torch.unsqueeze(img_hat_em, 0)
-                print('Shape!: ', masked_output.shape)
                 imgplot = plt.imshow(torch.permute(test_strip_img[0], (1, 2, 0)), cmap='Greys',  interpolation='nearest')
                 plt.show()
                 imgplot = plt.imshow(torch.permute(masked_output[0], (1, 2, 0)), cmap='Greys',  interpolation='nearest')
                 plt.show()
+                # Sum the result over the y dimension.
                 masked_output = torch.squeeze(masked_output)
-                print(masked_output.shape)
                 masked_output = torch.sum(masked_output, axis=-2)
-                #masked_output = torch.sum(masked_output, axis=1)
-                print(masked_output.shape)
-                imgplot = plt.imshow(torch.permute(img_hat_em, (1, 2, 0)), cmap='Greys',  interpolation='nearest')
+                # Sum the input image over the y dimension.
+                input_img_masked_sum = test_strip_img * torchvision.transforms.Grayscale()(img)
+                print(input_img_masked_sum.shape)
+                input_img_masked_sum = torch.squeeze(input_img_masked_sum)
+                print(input_img_masked_sum.shape)
+                input_img_masked_sum = torch.sum(input_img_masked_sum, axis=-2)
+                print(input_img_masked_sum.shape)
+                #imgplot = plt.imshow(torch.permute(img_hat_em, (1, 2, 0)), cmap='Greys',  interpolation='nearest')
+                imgplot = plt.imshow(torch.permute(img_hat_em, (1, 2, 0)), interpolation='nearest')
                 plt.show()
                 plt.plot(masked_output)
+                plt.plot(input_img_masked_sum)
                 plt.show()
                 break
 
