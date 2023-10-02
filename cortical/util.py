@@ -20,7 +20,8 @@ def get_sample_img(img_loader, device, color=True):
         sample = example_datas[0]
         sample = sample.to(device)[None, :]
     else:
-        sample = example_datas[0][0]
+        sample = example_datas[0]
+        sample = torchvision.transforms.Grayscale()(sample)[0]
         sample = sample.to(device)[None, None, :]
     return sample
 

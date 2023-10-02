@@ -45,6 +45,8 @@ parser.add_argument('-oc', '--old-scaler', type=int, default=1,
                     help='If the loaded file was scaled, that scaler value.')
 parser.add_argument('-bem', '--bypass-em', default=False, action='store_true',
                     help='If set, will disable the EM component of the model.')
+parser.add_argument('-gray', '--grayscale', default=False, action='store_true',
+                    help='If set, will force the input and output images to be grayscale.')
 args = parser.parse_args()
 
 
@@ -95,7 +97,8 @@ train_loader = torch.utils.data.DataLoader(train_dataset,
                                            shuffle=True)
 
 
-sample = util.get_sample_img(train_loader, device, color=True)
+print('Grayscale: ', args.grayscale)
+sample = util.get_sample_img(train_loader, device, color=not args.grayscale)
 print('Image shape: ', sample.shape)
 ih, iw = tuple(sample.shape[2:4])
 
@@ -158,7 +161,11 @@ softmax = torch.nn.Softmax(dim=0)
 # Initialize the model and grid with default params.
 for i in range(10):
     print(args.bypass_em)
-model = AutoEncoder(num_em_steps=em_steps, grid=grid, input_chans=3, output_chans=3, bypass_em=args.bypass_em).to(device)
+if(args.grayscale):
+    chans = 1
+else:
+    chans = 3
+model = AutoEncoder(num_em_steps=em_steps, grid=grid, input_chans=chans, output_chans=chans, bypass_em=args.bypass_em).to(device)
 print('All grid objects: ', [obj.name for obj in grid.objects])
 grid_params_to_learn = []
 grid_params_to_learn += [util.get_object_by_name(grid, 'xlow').inverse_permittivity]
@@ -271,7 +278,7 @@ stopwatch = time.time()
 # Train the weights
 for train_step in range(start_step + 1, start_step + args.max_steps):
     # Generate a new image
-    img = util.get_sample_img(train_loader, device, color=True)
+    img = util.get_sample_img(train_loader, device, color=not args.grayscale)
 
     # Reset grid and optimizer
     grid.reset()
@@ -292,6 +299,10 @@ for train_step in range(start_step + 1, start_step + args.max_steps):
     loss = torch.sum(weighted_loss_per_step)
 
     # Add the argmaxxed images to tensorboard
+    if(args.grayscale):
+        img =  img.expand(-1, 3, -1, -1)
+        img_hat_em_save =  img_hat_em_save.expand(3, -1, -1)
+    print(img[0,...].shape, img_hat_em_save.shape, util.norm_img_by_chan(e_field_img).shape, util.norm_img_by_chan(h_field_img).shape)
     img_grid = torchvision.utils.make_grid([img[0,...], img_hat_em_save,
         util.norm_img_by_chan(e_field_img), 
         util.norm_img_by_chan(h_field_img)])
