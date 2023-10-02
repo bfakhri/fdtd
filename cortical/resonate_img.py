@@ -302,7 +302,6 @@ for train_step in range(start_step + 1, start_step + args.max_steps):
     if(args.grayscale):
         img =  img.expand(-1, 3, -1, -1)
         img_hat_em_save =  img_hat_em_save.expand(3, -1, -1)
-    print(img[0,...].shape, img_hat_em_save.shape, util.norm_img_by_chan(e_field_img).shape, util.norm_img_by_chan(h_field_img).shape)
     img_grid = torchvision.utils.make_grid([img[0,...], img_hat_em_save,
         util.norm_img_by_chan(e_field_img), 
         util.norm_img_by_chan(h_field_img)])
