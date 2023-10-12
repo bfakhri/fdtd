@@ -34,6 +34,8 @@ parser.add_argument('-is', '--image-size', type=int, default=40,
                     help='Size of each side of the image. Determines grid size.')
 parser.add_argument('-sc', '--image-scaler', type=int, default=1,
                     help='How much to scale the entire simulation by (changes the dimensions of the model).')
+parser.add_argument('-gray', '--grayscale', default=False, action='store_true',
+                    help='If set, will force the input and output images to be grayscale.')
 args = parser.parse_args()
 
 def get_sorted_paths(directory_list, target_ext='.png'):
@@ -46,17 +48,6 @@ def get_sorted_paths(directory_list, target_ext='.png'):
     return path_list
 
 img_paths = get_sorted_paths(['./optical_illusions/'])
-
-#TODO - move this to a util file next cleanup
-def get_sample_img(img_loader, color=True):
-    _, (example_datas, labels) = next(enumerate(img_loader))
-    if(color):
-        sample = example_datas[0]
-        sample = sample.to(device)[None, :]
-    else:
-        sample = example_datas[0][0]
-        sample = sample.to(device)[None, None, :]
-    return sample
 
 def get_object_by_name(grid, name):
     for obj in grid.objects:
@@ -84,14 +75,6 @@ def norm_img_by_chan(img):
     chans_dynamic_range = chan_maxes - chan_mins
     normed_img = (img - chan_mins[...,None])/(chans_dynamic_range[...,None])
     return normed_img 
-
-class RandomRot90:
-    # Randomly rotates the image by multiples of 90 degrees.
-    def __init__(self):
-        pass
-
-    def __call__(self, sample):
-        return torch.rot90(sample, k=random.randrange(4), dims=[1, 2])
 
 # Setup model saving
 model_parent_dir = './model_checkpoints/'
@@ -168,7 +151,11 @@ loss_step_weights.requires_grad = True
 softmax = torch.nn.Softmax(dim=0)
 
 # Initialize the model and grid with default params.
-model = AutoEncoder(num_em_steps=em_steps, grid=grid, input_chans=3, output_chans=3).to(device)
+if(args.grayscale):
+    chans = 1
+else:
+    chans = 3
+model = AutoEncoder(num_em_steps=em_steps, grid=grid, input_chans=chans, output_chans=chans).to(device)
 print('All grid objects: ', [obj.name for obj in grid.objects])
 grid_params_to_learn = []
 grid_params_to_learn += [get_object_by_name(grid, 'xlow').inverse_permittivity]
@@ -272,6 +259,10 @@ with torch.inference_mode():
         print('Opening image {0} with test strip file {1}'.format(img_file, test_strip_file))
         img = Image.open(img_file)
         img = image_transform(img)[None, ...]
+        if(args.grayscale):
+            img = torchvision.transforms.Grayscale()(img)[0, ...]
+        else:
+            img = torchvision.transforms.Grayscale()(img)
         try:
             test_strip_img = np.array(Image.open(test_strip_file))
             #test_strip_img = torch.array(Image.open(test_strip_file))
@@ -288,19 +279,27 @@ with torch.inference_mode():
         # Reset grid
         grid.reset()
         for em_step, (img_hat_em, em_field) in enumerate(model(img)):
-            print('Generating image for illusion {0} and em step {1}'.format(img_idx, em_step), end='\r')
+            print('Generating image for illusion {0} and em step {1}'.format(img_idx, em_step))
             # Process outputs
             e_field_img = em_field[0:3,...]
             h_field_img = em_field[3:6,...]
+            if(args.grayscale):
+                img_hat_em =  img_hat_em.expand(3, -1, -1)
+                img_out =  img.expand(3, -1, -1)[None, ...]
+            else:
+                img_out = img
             # Generate the grid.
-            img_grid = torchvision.utils.make_grid([img[0,...], img_hat_em,
+            img_grid = torchvision.utils.make_grid([img_out[0,...], img_hat_em,
                 norm_img_by_chan(e_field_img), 
                 norm_img_by_chan(h_field_img)])
             img_grid = torchvision.transforms.functional.resize(img_grid, size=(img_grid.shape[1] * 4, img_grid.shape[2] * 4), interpolation=torchvision.transforms.InterpolationMode.NEAREST)
 
             if(em_step >= argmax_step):
-                # Converting to grayscale
-                img_hat_em = torchvision.transforms.Grayscale()(img_hat_em)
+                # Converting to grayscale and choose how many channels.
+                if(args.grayscale):
+                    img_hat_em = torchvision.transforms.Grayscale()(img_hat_em)[0, ...]
+                else:
+                    img_hat_em = torchvision.transforms.Grayscale()(img_hat_em)
                 # Mask the image
                 masked_output = test_strip_img * torch.unsqueeze(img_hat_em, 0)
                 cv2.imshow('frame', torch.permute(test_strip_img[0], (1, 2, 0)).numpy())
@@ -309,12 +308,14 @@ with torch.inference_mode():
                 masked_output = torch.squeeze(masked_output)
                 masked_output = torch.sum(masked_output, axis=-2)
                 # Sum the input image over the y dimension.
-                input_img_masked_sum = test_strip_img * torchvision.transforms.Grayscale()(img)
+                input_img_masked_sum = test_strip_img * img
                 print(input_img_masked_sum.shape)
                 input_img_masked_sum = torch.squeeze(input_img_masked_sum)
                 print(input_img_masked_sum.shape)
                 input_img_masked_sum = torch.sum(input_img_masked_sum, axis=-2)
-                cv2.imshow('frame3', torch.permute(img_hat_em, (1, 2, 0)).numpy())
+                print('shape: ', img_hat_em.shape)
+                #cv2.imshow('frame3', torch.permute(img_hat_em, (1, 2, 0)).numpy())
+                cv2.imshow('frame3', img_hat_em.numpy())
                 plt.plot(masked_output)
                 plt.plot(input_img_masked_sum)
                 plt.show()

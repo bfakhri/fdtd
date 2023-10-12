@@ -33,6 +33,8 @@ parser.add_argument('-is', '--image-size', type=int, default=40,
                     help='Size of each side of the image. Determines grid size.')
 parser.add_argument('-sc', '--image-scaler', type=int, default=1,
                     help='How much to scale the entire simulation by (changes the dimensions of the model).')
+parser.add_argument('-gray', '--grayscale', default=False, action='store_true',
+                    help='If set, will force the input and output images to be grayscale.')
 args = parser.parse_args()
 
 def get_sorted_paths(directory_list, target_ext='.png'):
@@ -167,7 +169,11 @@ loss_step_weights.requires_grad = True
 softmax = torch.nn.Softmax(dim=0)
 
 # Initialize the model and grid with default params.
-model = AutoEncoder(num_em_steps=em_steps, grid=grid, input_chans=3, output_chans=3).to(device)
+if(args.grayscale):
+    chans = 1
+else:
+    chans = 3
+model = AutoEncoder(num_em_steps=em_steps, grid=grid, input_chans=chans, output_chans=chans).to(device)
 print('All grid objects: ', [obj.name for obj in grid.objects])
 grid_params_to_learn = []
 grid_params_to_learn += [get_object_by_name(grid, 'xlow').inverse_permittivity]
@@ -281,6 +287,10 @@ with torch.inference_mode():
         power_graph[img_file] = {'E': [], 'H': []}
         img = Image.open(img_file)
         img = image_transform(img)[None, ...]
+        if(args.grayscale):
+            img = torchvision.transforms.Grayscale()(img)[0, ...]
+        else:
+            img = torchvision.transforms.Grayscale()(img)
         print(img_file, img.shape)
         # Reset grid
         grid.reset()
@@ -291,8 +301,13 @@ with torch.inference_mode():
             h_field_img = em_field[3:6,...]
             power_graph[img_file]['E'] += [torch.sum(e_field_img**2).numpy()]
             power_graph[img_file]['H'] += [torch.sum(h_field_img**2).numpy()]
+            if(args.grayscale):
+                img_hat_em =  img_hat_em.expand(3, -1, -1)
+                img_out =  img.expand(3, -1, -1)[None, ...]
+            else:
+                img_out = img
             # Write to TB
-            img_grid = torchvision.utils.make_grid([img[0,...], img_hat_em,
+            img_grid = torchvision.utils.make_grid([img_out[0,...], img_hat_em,
                 norm_img_by_chan(e_field_img), 
                 norm_img_by_chan(h_field_img)])
             img_grid = torchvision.transforms.functional.resize(img_grid, size=(img_grid.shape[1] * 4, img_grid.shape[2] * 4), interpolation=torchvision.transforms.InterpolationMode.NEAREST)

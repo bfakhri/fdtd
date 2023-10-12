@@ -52,6 +52,18 @@ def norm_img_by_chan(img):
     normed_img = (img - chan_mins[...,None])/(chans_dynamic_range[...,None])
     return normed_img 
 
+def gauss_norm_img_by_chan(img, s=6):
+    '''
+    Puts each channel into the range [0,1], clipping everything outside of s standard deviations.
+    Expects input to be in CHW config.
+    '''
+    img_flat = torch.reshape(img, (3, -1))
+    chan_means = torch.mean(img_flat, dim=-1)[...,None] 
+    chan_stddevs = torch.std(img_flat, dim=-1)[...,None] 
+    normed_img = (img - chan_means[...,None])/(chan_stddevs[...,None]) + 0.5
+    normed_img = torch.clip(normed_img, min=0, max=1)
+    return normed_img 
+
 class RandomRot90:
     # Randomly rotates the image by multiples of 90 degrees.
     def __init__(self):
