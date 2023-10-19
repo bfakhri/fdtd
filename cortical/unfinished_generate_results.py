@@ -255,8 +255,10 @@ with torch.inference_mode():
     for img_idx, img_file in enumerate(img_paths):
         # Get the path of the test strip
         illusion_path, illusion_filename = img_file.rsplit('/', 1)
-        test_strip_file = illusion_path + '/test_strips/' + illusion_filename.split('.')[0] + '_teststrip.png'
-        print('Opening image {0} with test strip file {1}'.format(img_file, test_strip_file))
+        test_strip_pref = illusion_path + '/test_strips/' + illusion_filename.split('.')[0]
+        test_strip_file_a = test_strip_pref + '_teststrip_part_a.png'
+        test_strip_file_b = test_strip_pref + '_teststrip_part_b.png'
+        print('Opening image {0} with test strip file {1}'.format(img_file, test_strip_file_a))
         img = Image.open(img_file)
         img = image_transform(img)[None, ...]
         if(args.grayscale):
@@ -264,18 +266,25 @@ with torch.inference_mode():
         else:
             img = torchvision.transforms.Grayscale()(img)
         try:
-            test_strip_img = np.array(Image.open(test_strip_file))
-            #test_strip_img = torch.array(Image.open(test_strip_file))
-            print(img_file, img.shape)
+            test_strip_img_a = np.array(Image.open(test_strip_file_a))
         except:
-            print('Could not find {0}, skipping'.format(test_strip_file))
+            print('Could not find {0}, skipping'.format(test_strip_file_a))
             continue
+        try:
+            test_strip_img_b = np.array(Image.open(test_strip_file_b))
+        except:
+            print('Could not find {0}, making zeros.'.format(test_strip_file_b))
+            test_strip_img_b = np.zeros_like(test_strip_img_a)
         # Make sure it is binary.
-        assert np.sum(((test_strip_img > 0) * (test_strip_img < 1)).astype(np.int)) <= 0
-        test_strip_img = image_transform(test_strip_img)[None, ...]
+        assert np.sum(((test_strip_img_a > 0) * (test_strip_img_a < 1)).astype(np.int)) <= 0
+        assert np.sum(((test_strip_img_b > 0) * (test_strip_img_b < 1)).astype(np.int)) <= 0
+        test_strip_img_a = image_transform(test_strip_img_a)[None, ...]
+        test_strip_img_b = image_transform(test_strip_img_b)[None, ...]
         # Re-binarize after the resize.
-        test_strip_img = (test_strip_img > 0.5).float()
-        print('Test strip stats: ', torch.mean(test_strip_img), torch.min(test_strip_img), torch.max(test_strip_img))
+        test_strip_img_a = (test_strip_img_a > 0.5).float()
+        test_strip_img_b = (test_strip_img_b > 0.5).float()
+        print('Test strip stats: ', torch.mean(test_strip_img_a), torch.min(test_strip_img_a), torch.max(test_strip_img_a))
+        print('Test strip stats: ', torch.mean(test_strip_img_b), torch.min(test_strip_img_b), torch.max(test_strip_img_b))
         # Reset grid
         grid.reset()
         for em_step, (img_hat_em, em_field) in enumerate(model(img)):
@@ -301,22 +310,24 @@ with torch.inference_mode():
                 else:
                     img_hat_em = torchvision.transforms.Grayscale()(img_hat_em)
                 # Mask the image
-                masked_output = test_strip_img * torch.unsqueeze(img_hat_em, 0)
-                cv2.imshow('frame', torch.permute(test_strip_img[0], (1, 2, 0)).numpy())
-                cv2.imshow('frame2', torch.permute(masked_output[0], (1, 2, 0)).numpy())
+                masked_output_a = test_strip_img_a * torch.unsqueeze(img_hat_em, 0)
+                masked_output_b = test_strip_img_b * torch.unsqueeze(img_hat_em, 0)
+                print(torch.permute(test_strip_img_a[0], (1, 2, 0)).numpy().shape)
+                cv2.imshow('test_a', torch.permute(test_strip_img_a[0], (1, 2, 0)).numpy())
+                cv2.imshow('test_b', torch.permute(test_strip_img_b[0], (1, 2, 0)).numpy())
+                cv2.imshow('masked_output_a', torch.permute(masked_output_a[0], (1, 2, 0)).numpy())
+                cv2.imshow('masked_output_b', torch.permute(masked_output_b[0], (1, 2, 0)).numpy())
                 # Sum the result over the y dimension.
-                masked_output = torch.squeeze(masked_output)
-                masked_output = torch.sum(masked_output, axis=-2)
+                masked_output_a = torch.squeeze(masked_output_a)
+                masked_output_b = torch.squeeze(masked_output_b)
+                masked_output_a = torch.sum(masked_output_a, axis=-2)
+                masked_output_b = torch.sum(masked_output_b, axis=-2)
                 # Sum the input image over the y dimension.
-                input_img_masked_sum = test_strip_img * img
-                print(input_img_masked_sum.shape)
+                input_img_masked_sum = test_strip_img_a * img
                 input_img_masked_sum = torch.squeeze(input_img_masked_sum)
-                print(input_img_masked_sum.shape)
                 input_img_masked_sum = torch.sum(input_img_masked_sum, axis=-2)
-                print('shape: ', img_hat_em.shape)
-                #cv2.imshow('frame3', torch.permute(img_hat_em, (1, 2, 0)).numpy())
                 cv2.imshow('frame3', img_hat_em.numpy())
-                plt.plot(masked_output)
+                plt.plot(masked_output_a)
                 plt.plot(input_img_masked_sum)
                 plt.show()
                 cv2.waitKey()
