@@ -1,0 +1,3 @@
+python illusions.py -gray --image-scaler 5 --load-file model_checkpoints/grayscale/md_000000009000.pt
+python unfinished_generate_results.py -gray --image-scaler 5 --load-file model_checkpoints/grayscale/md_000000009000.pt
+python resonate_img.py -gray --image-scaler 5 --save-steps 200 --load-file model_checkpoints/grayscale/md_000000007200.pt
