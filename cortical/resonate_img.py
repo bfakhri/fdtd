@@ -326,9 +326,6 @@ for train_step in range(start_step + 1, start_step + args.max_steps):
     print('Step: ', train_step, '\tTime: ', grid.time_steps_passed, '\tLoss: ', loss)
 
     # Tensorboard
-    writer.add_histogram('cc_dirs', model.cc_dirs, train_step)
-    writer.add_histogram('cc_freqs', model.cc_freqs, train_step)
-    writer.add_histogram('cc_phases', model.cc_phases, train_step)
     writer.add_histogram('sm_conv_lin', model.sm_conv_linear.weight, train_step)
     writer.add_histogram('cc_nonlin_w', util.get_source_by_name(grid, 'cc').nonlin_conv.weight, train_step)
     writer.add_histogram('cc_nonlin_b', util.get_source_by_name(grid, 'cc').nonlin_conv.bias, train_step)

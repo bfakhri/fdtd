@@ -1,4 +1,1 @@
-# Purpose
-The autoencoder can change the permeability/permittivity via activations.
-
-# Results
+This branch will make the sources more far apart and cap the energy they can impart (somehow). 

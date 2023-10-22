@@ -15,12 +15,11 @@ plt.rcParams["savefig.bbox"] = 'tight'
 
 ## Then define the model class
 class AutoEncoder(nn.Module):
-    def __init__(self, grid, num_em_steps, input_chans=3, num_ccs=16, output_chans=3, wavelen_mean=1550e-3, freq_std_div=10, bypass_em=False):
+    def __init__(self, grid, num_em_steps, input_chans=3, output_chans=3, max_freq=100, bypass_em=False):
         super(AutoEncoder, self).__init__()
         self.em_grid = grid
         self.num_em_steps = num_em_steps
         ic = input_chans
-        cc = num_ccs
         oc = output_chans
         self.bypass_em = bypass_em
         # Convolutions for common feature extractor
@@ -29,32 +28,19 @@ class AutoEncoder(nn.Module):
         self.conv3 = nn.Conv2d(16,  8, kernel_size=5, stride=1, padding='same')
         self.conv4 = nn.Conv2d( 8,  8, kernel_size=5, stride=1, padding='same')
         self.conv5 = nn.Conv2d( 8,  8, kernel_size=5, stride=1, padding='same')
-        # Convs for CC activations
+        # Convs for CC activations [0,1) scaled (amp, freq, phase)
         self.conv6 = nn.Conv2d( 8,  8, kernel_size=5, stride=1, padding='same')
-        self.conv7 = nn.Conv2d( 8, cc, kernel_size=5, stride=1, padding='same')
+        self.conv7 = nn.Conv2d( 8,  3, kernel_size=5, stride=1, padding='same')
         # Convs for substrate manipulation
-        self.sm_conv_linear = nn.Conv2d( cc,  9, kernel_size=1, stride=1, padding='same')
+        self.sm_conv_linear = nn.Conv2d(3, 9, kernel_size=1, stride=1, padding='same')
         # Converts E and H fields back into an image with a linear transformation
         if(bypass_em):
             self.conv_linear = nn.Conv2d(16, oc, kernel_size=1, stride=1, padding='same')
         else:
-            self.conv_linear = nn.Conv2d(6, oc, kernel_size=1, stride=1, padding='same')
-        # Converts cc_activations back into an image (for aux loss)
-        self.conv_aux1 = nn.Conv2d( cc,  8, kernel_size=3, stride=1, padding='same')
-        self.conv_aux2 = nn.Conv2d(  8,  8, kernel_size=3, stride=1, padding='same')
-        self.conv_aux3 = nn.Conv2d(  8, oc, kernel_size=3, stride=1, padding='same')
-        # Direction of E field perturbations
-        # (output (E field), input (E field), kernel_T, kernel_H, kernel_W)
-        # They must sum to zero and we just add them to the E field, no multiplication necessary
-        #TODO - make sure these dir kernels make sense (check the sum)
-        self.cc_dirs = torch.nn.Parameter(2*torch.rand((1, cc, 3, 3)) - 1)
-        #TODO - remove this dumb line?
-        self.cc_dirs = self.cc_dirs
+            self.conv_linear = nn.Conv2d( 6, oc, kernel_size=1, stride=1, padding='same')
 
-        means = 1.0/wavelen_mean*torch.ones(num_ccs)
-        stds = (means/freq_std_div)*torch.ones(num_ccs)
-        self.cc_freqs  = torch.nn.Parameter(torch.normal(mean=means, std=stds))
-        self.cc_phases = torch.nn.Parameter(torch.rand((num_ccs)))
+        # The base frequency that is scaled via the cc_activations (learnable).
+        self.max_freq = torch.nn.Parameter(torch.Tensor(max_freq))
 
     def get_em_plane(self):
         ' Extracts a slice along the image plane from the EM field. '
@@ -79,7 +65,7 @@ class AutoEncoder(nn.Module):
         x = self.conv6(x)
         x = torch.relu(x)
         x = self.conv7(x)
-        cc_activations = x
+        cc_activations = torch.sigmoid(x)
         # Branch to substrate manipulation
         sm_activations = self.sm_conv_linear(cc_activations)
 
@@ -90,7 +76,7 @@ class AutoEncoder(nn.Module):
         else:
             ## 2 - Seed the cc grid source
             #TODO reference this one by name like #3
-            self.em_grid.sources[0].seed(cc_activations, self.cc_dirs, self.cc_freqs, self.cc_phases, amp_scaler)
+            self.em_grid.sources[0].seed(cc_activations, amp_scaler)
 
             ## 3 - Seed the substrate
             util.get_object_by_name(self.em_grid, 'cc_substrate').seed(sm_activations)

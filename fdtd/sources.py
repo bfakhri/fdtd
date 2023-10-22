@@ -556,20 +556,13 @@ class CorticalColumnPlaneSource(PlaneSource):
         # Takes the field energies (E and  H) as input and outputs modifiers for each cc.
         self.nonlin_conv = torch.nn.Conv2d( 2, self.num_ccs, kernel_size=1, stride=1, padding='same')
 
-    def seed(self, cc_activations, cc_dirs, cc_freqs, cc_phases, amp_scaler):
+    def seed(self, cc_activations, max_freq):
         #TODO: this description is out of date, fix it.
         '''
-        cc_activations: (num_ccs, H, W)
-        cc_seeds should be of the form: (num_ccs, 2) where 3 is:
-            - Freq of the CC.
-            - Phase of the CC.
-        cc_dirs should be of shape: (out_chans, num_ccs, T, H, W)
+        cc_activations: (3, H, W) --> ((amplitude, freq, phase_shift), H, W)
         '''
         self.cc_activations = cc_activations
-        self.cc_dirs = cc_dirs
-        self.cc_freqs  = cc_freqs
-        self.cc_phases = cc_phases
-        self.amp_scaler = amp_scaler
+        self.max_freq = max_freq 
 
     def update_H(self):
         """Add the source to the magnetic field"""
@@ -577,32 +570,32 @@ class CorticalColumnPlaneSource(PlaneSource):
 
     def update_E(self):
         """Add the source to the electric field"""
-        if(self.cc_dirs is None):
+        if(self.cc_activations is None):
             print('Error: Cortical Column source must be seeded')
             return -1
 
-        # Calculate energy of E and H fields.
-        with torch.no_grad():
-            grid_energy_E = bd.sum(self.grid.E ** 2, -1)
-            grid_energy_H = bd.sum(self.grid.H ** 2, -1)
-            grid_energy = torch.stack([grid_energy_E, grid_energy_H], dim=0)
-            grid_energy = torch.permute(grid_energy, (3, 0, 1, 2))
-        nonlin_modifier = torch.sigmoid(self.nonlin_conv(grid_energy))
+        # Decode activations into amplitude, frequency, and phase and scale them.
+        # Amplitude (-1, 1)
+        cc_amps = 2*self.cc_activations[0, 0, ...] - 1.0
+        # Frequency scaler (0, 1) (already in range).
+        cc_freqs = self.cc_activations[0, 1, ...]
+        # Phase scaler (0, 1) (already in range).
+        cc_phases = self.cc_activations[0, 2, ...]
+
+        ## Calculate energy of E and H fields.
+        #with torch.no_grad():
+        #    grid_energy_E = bd.sum(self.grid.E ** 2, -1)
+        #    grid_energy_H = bd.sum(self.grid.H ** 2, -1)
+        #    grid_energy = torch.stack([grid_energy_E, grid_energy_H], dim=0)
+        #    grid_energy = torch.permute(grid_energy, (3, 0, 1, 2))
+        #nonlin_modifier = torch.sigmoid(self.nonlin_conv(grid_energy))
 
         # Calculate the oscillation based on the amount of time passed.
         q = self.grid.time_steps_passed*self.grid.time_step
-        osc = torch.sin(2 * pi * q * self.cc_freqs + self.cc_phases)
-        # Normalize the kernel so it an only "move" E value, not add/remove any.
-        dirs_zerosum = self.cc_dirs/torch.sum(torch.reshape(self.cc_dirs, (1, self.cc_dirs.shape[1], -1)), axis=-1)[:,:,None,None]
-        E_tp = torch.permute(self.grid.E[self.x, self.y, :, ...], (2,3,0,1))
-        img_shape_tp = np.array(list(E_tp[:,0,...].shape)) - np.array((0, 2, 2))
-        conv_out = torch.conv_transpose2d(bd.ones(tuple(img_shape_tp)), dirs_zerosum, bias=None, stride=1)
-        # Scale the kernel output by the activations,  oscillator, and non-linearities.
-        conv_out_scaled = osc[None,:,None,None] * conv_out[None,...] * self.cc_activations * nonlin_modifier[..., self.x, self.y] * self.amp_scaler
-        # Sum over the CC dimension to calc the final perturbation.
-        conv_out_scaled = torch.sum(conv_out_scaled, axis=1)
+        osc = cc_amps * torch.sin(2 * pi * (q * self.max_freq * cc_freqs + cc_freqs * cc_phases))
+
         # Add perturbation to grid on the Z axis.
-        self.grid.E[self.x, self.y, :, -1] += torch.permute(conv_out_scaled, (1,2,0))
+        self.grid.E[self.x, self.y, :, -1] += osc[..., None]
 
 
 
