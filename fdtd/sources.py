@@ -595,7 +595,7 @@ class CorticalColumnPlaneSource(PlaneSource):
         osc = cc_amps * torch.sin(2 * pi * (q * self.max_freq * cc_freqs + cc_freqs * cc_phases))
 
         # Add perturbation to grid on the Z axis.
-        self.grid.E[self.x, self.y, :, -1] += osc[..., None]
+        self.grid.E[self.x, self.y, :, -1][::8, ::8, ...] += osc[..., None]
 
 
 

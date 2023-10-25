@@ -15,7 +15,7 @@ plt.rcParams["savefig.bbox"] = 'tight'
 
 ## Then define the model class
 class AutoEncoder(nn.Module):
-    def __init__(self, grid, num_em_steps, input_chans=3, output_chans=3, max_freq=100, bypass_em=False):
+    def __init__(self, grid, num_em_steps, input_chans=3, output_chans=3, max_freq=100, source_stride=8, bypass_em=False):
         super(AutoEncoder, self).__init__()
         self.em_grid = grid
         self.num_em_steps = num_em_steps
@@ -31,6 +31,7 @@ class AutoEncoder(nn.Module):
         # Convs for CC activations [0,1) scaled (amp, freq, phase)
         self.conv6 = nn.Conv2d( 8,  8, kernel_size=5, stride=1, padding='same')
         self.conv7 = nn.Conv2d( 8,  3, kernel_size=5, stride=1, padding='same')
+        self.conv_downscaler = nn.Conv2d( 3,  3, kernel_size=source_stride, stride=source_stride)
         # Convs for substrate manipulation
         self.sm_conv_linear = nn.Conv2d(3, 9, kernel_size=1, stride=1, padding='same')
         # Converts E and H fields back into an image with a linear transformation
@@ -49,7 +50,7 @@ class AutoEncoder(nn.Module):
         em_plane = torch.permute(torch.squeeze(em_plane), (2,0,1))
         return em_plane
 
-    def forward(self, x, em_steps=None, amp_scaler=1.0):
+    def forward(self, x, em_steps=None, amp_scaler=1.0, summary_writer=None, train_step=None):
         ## 1 - Extract features
         # Convert image into amplitude, frequency, and phase shift for our CCs.
         x = self.conv1(x)
@@ -65,9 +66,19 @@ class AutoEncoder(nn.Module):
         x = self.conv6(x)
         x = torch.relu(x)
         x = self.conv7(x)
-        cc_activations = torch.sigmoid(x)
-        # Branch to substrate manipulation
-        sm_activations = self.sm_conv_linear(cc_activations)
+        x = torch.relu(x)
+        # Get activations as a downscaled version of the activations.
+        cc_activations = self.conv_downscaler(x)
+        # Branch to substrate manipulation.
+        sm_activations = self.sm_conv_linear(x)
+
+        # Write out summary if the writer is present
+        if(summary_writer is not None):
+            summary_writer.add_histogram('cc_amplitudes', cc_activations[0, 0], train_step)
+            summary_writer.add_histogram('cc_freqs', cc_activations[0, 1], train_step)
+            summary_writer.add_histogram('cc_phases', cc_activations[0, 2], train_step)
+            summary_writer.add_histogram('sm_activations', sm_activations, train_step)
+
 
         if(self.bypass_em):
             x_hat_em = torch.sigmoid(self.conv_linear(cc_activations))
