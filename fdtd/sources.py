@@ -574,13 +574,10 @@ class CorticalColumnPlaneSource(PlaneSource):
             print('Error: Cortical Column source must be seeded')
             return -1
 
-        # Decode activations into amplitude, frequency, and phase and scale them.
-        # Amplitude (-1, 1)
-        cc_amps = 2*self.cc_activations[0, 0, ...] - 1.0
-        # Frequency scaler (0, 1) (already in range).
-        cc_freqs = self.cc_activations[0, 1, ...]
-        # Phase scaler (0, 1) (already in range).
-        cc_phases = self.cc_activations[0, 2, ...]
+        # Decode activations into amplitude, frequency, and phase.
+        cc_amps = self.cc_activations[0, 0]
+        cc_freqs = self.cc_activations[0, 1]
+        cc_phases = self.cc_activations[0, 2]
 
         ## Calculate energy of E and H fields.
         #with torch.no_grad():

@@ -69,8 +69,16 @@ class AutoEncoder(nn.Module):
         x = torch.relu(x)
         # Get activations as a downscaled version of the activations.
         cc_activations = self.conv_downscaler(x)
+        # Scale the activations
+        # Amplitude (-1, 1)
+        cc_activations[:,0] = 2*torch.sigmoid(cc_activations[:, 0]) - 1.0
+        # Frequency scaler (0, 1)
+        cc_activations[:,1] = torch.sigmoid(cc_activations[:, 1])
+        # Phase scaler (0, 1) (already in range).
+        cc_activations[:,2] = torch.sigmoid(cc_activations[:, 2])
+
         # Branch to substrate manipulation.
-        sm_activations = self.sm_conv_linear(x)
+        sm_activations = torch.sigmoid(self.sm_conv_linear(x))
 
         # Write out summary if the writer is present
         if(summary_writer is not None):

@@ -345,7 +345,7 @@ class LearnableAnisotropicObject(Object):
                 sys.exit()
             nonlin_modifier = nonlin_modifier * self.sm_activations
         elif(self.sm_activations is not None):
-            nonlin_modifier = 1.0/self.sm_activations
+            nonlin_modifier = self.sm_activations
         else:
             nonlin_modifier = torch.Tensor([1.0])
         
