@@ -77,8 +77,8 @@ class AutoEncoder(nn.Module):
         # Phase scaler (0, 1) (already in range).
         cc_activations[:,2] = torch.sigmoid(cc_activations[:, 2])
 
-        # Branch to substrate manipulation.
-        sm_activations = torch.sigmoid(self.sm_conv_linear(x))
+        # Branch to substrate manipulation. Compress it to (0.1, 1.0) for stability.
+        sm_activations = 0.9*torch.sigmoid(self.sm_conv_linear(x)) + 0.1
 
         # Write out summary if the writer is present
         if(summary_writer is not None):
