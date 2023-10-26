@@ -26,7 +26,7 @@ import torch
 class Object:
     """ An object to place in the grid """
 
-    def __init__(self, permittivity: Tensorlike, name: str = None):
+    def __init__(self, permittivity: Tensorlike, name: str = None, device=None):
         """
         Args:
             permittivity: permittivity tensor
@@ -35,6 +35,7 @@ class Object:
         self.grid = None
         self.name = name
         self.permittivity = bd.array(permittivity)
+        self.device = device
 
     def _register_grid(
         self, grid: Grid, x: ListOrSlice, y: ListOrSlice, z: ListOrSlice
@@ -276,7 +277,7 @@ class LearnableAnisotropicObject(Object):
     """ An object with anisotropic permittivity tensor """
 
     def __init__(
-        self, permittivity: Tensorlike, is_substrate=False, name: str = None
+        self, permittivity: Tensorlike, is_substrate=False, name: str = None, device = None
     ):
         """
         Args:
@@ -285,9 +286,9 @@ class LearnableAnisotropicObject(Object):
             is_substrate: whether or not nonlinearity will be enabled.
             name: name of the object (will become available as attribute to the grid)
         """
-        super().__init__(permittivity, name)
+        super().__init__(permittivity, name, device)
         # Takes the field energies (E and  H) as input and outputs modifiers for the permitivity.
-        self.nonlin_conv = torch.nn.Conv2d( 2, 3*3, kernel_size=1, stride=1, padding='same')
+        self.nonlin_conv = torch.nn.Conv2d( 2, 3*3, kernel_size=1, stride=1, padding='same', device=self.device)
         self.is_substrate = is_substrate
         self.sm_activations = None
 
@@ -347,7 +348,7 @@ class LearnableAnisotropicObject(Object):
         elif(self.sm_activations is not None):
             nonlin_modifier = self.sm_activations
         else:
-            nonlin_modifier = torch.Tensor([1.0])
+            nonlin_modifier = torch.tensor([1.0], device=self.device)
         
         
         self.grid.E[loc] += bd.reshape(

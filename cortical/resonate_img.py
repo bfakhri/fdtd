@@ -138,10 +138,10 @@ print('Time steps the grid will run for: ', em_steps)
 
 
 # Create learnable objects at the boundaries
-grid[  0: bw, :, :] = fdtd.LearnableAnisotropicObject(permittivity=2.5, name="xlow")
-grid[-bw:   , :, :] = fdtd.LearnableAnisotropicObject(permittivity=2.5, name="xhigh")
-grid[:,   0:bw, :] = fdtd.LearnableAnisotropicObject(permittivity=2.5, name="ylow")
-grid[:, -bw:  , :] = fdtd.LearnableAnisotropicObject(permittivity=2.5, name="yhigh")
+grid[  0: bw, :, :] = fdtd.LearnableAnisotropicObject(permittivity=2.5, name="xlow", device=device)
+grid[-bw:   , :, :] = fdtd.LearnableAnisotropicObject(permittivity=2.5, name="xhigh", device=device)
+grid[:,   0:bw, :] = fdtd.LearnableAnisotropicObject(permittivity=2.5, name="ylow", device=device)
+grid[:, -bw:  , :] = fdtd.LearnableAnisotropicObject(permittivity=2.5, name="yhigh", device=device)
 grid[:, :, 0] = fdtd.PeriodicBoundary(name="zbounds")
 
 # Creat the cortical column sources
@@ -152,20 +152,18 @@ grid[bw:bw+ih,bw:bw+iw,0] = fdtd.CorticalColumnPlaneSource(
 )
 
 # Object defining the cortical column substrate 
-grid[bw:-bw, bw:-bw, :] = fdtd.LearnableAnisotropicObject(permittivity=2.5, is_substrate=True, name="cc_substrate")
+grid[bw:-bw, bw:-bw, :] = fdtd.LearnableAnisotropicObject(permittivity=2.5, is_substrate=True, name="cc_substrate", device=device)
 # List all model checkpoints
 checkpoints = [f for f in listdir(model_checkpoint_dir) if(isfile(join(model_checkpoint_dir, f)) and f.endswith('.pt'))]
 
 torch.autograd.set_detect_anomaly(True)
 # The weights for the reconstruction loss at each em time step. 
-loss_step_weights = torch.ones(em_steps)/em_steps
+loss_step_weights = torch.ones(em_steps, device=device)/em_steps
 #loss_step_weights = torch.nn.Parameter(torch.reshape(loss_step_weights, (-1, 1, 1, 1, 1)))
 loss_step_weights.requires_grad = True
 softmax = torch.nn.Softmax(dim=0)
 
 # Initialize the model and grid with default params.
-for i in range(10):
-    print(args.bypass_em)
 if(args.grayscale):
     chans = 1
 else:
