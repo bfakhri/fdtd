@@ -47,6 +47,8 @@ parser.add_argument('-bem', '--bypass-em', default=False, action='store_true',
                     help='If set, will disable the EM component of the model.')
 parser.add_argument('-gray', '--grayscale', default=False, action='store_true',
                     help='If set, will force the input and output images to be grayscale.')
+parser.add_argument('-thw', '--target-half-way', default=False, action='store_true',
+                    help='If set, will only produce loss for the timestep halfway up the coverage ratio.')
 args = parser.parse_args()
 
 
@@ -128,7 +130,10 @@ grid_diag_len = grid_diag_cells * GRID_SPACING
 grid_diag_steps = int(grid_diag_len/SPEED_LIGHT/grid.time_step)+1
 print('Time steps to cover entire grid: ', grid_diag_steps)
 # The number of steps is based on the coverage ratio.
-em_steps = int(grid_diag_steps*args.coverage_ratio)
+if(args.target_half_way):
+    em_steps = int(grid_diag_steps*args.coverage_ratio/2)
+else:
+    em_steps = int(grid_diag_steps*args.coverage_ratio)
 print('Time steps the grid will run for: ', em_steps)
 
 
@@ -289,13 +294,21 @@ for train_step in range(start_step + 1, start_step + args.max_steps):
     em_step_loss_weight_dist = softmax(loss_step_weights)
     argmax_step = torch.argmax(torch.squeeze(loss_step_weights))
     for em_step, (img_hat_em, em_field) in enumerate(model(img, summary_writer=writer, train_step=train_step)):
-        loss_list += [loss_fn(img_hat_em[None, ...], img)]
+        # Only add the last step to the loss if we half target_half_way enabled.
+        if(args.target_half_way and em_step == em_steps-1):
+            loss_list += [loss_fn(img_hat_em[None, ...], img)]
+        else:
+            loss_list += [loss_fn(img_hat_em[None, ...], img)]
         if(em_step == argmax_step):
             e_field_img = em_field[0:3,...]
             h_field_img = em_field[3:6,...]
             img_hat_em_save = img_hat_em
     loss_per_step = torch.stack(loss_list)
-    weighted_loss_per_step = loss_per_step * em_step_loss_weight_dist
+    # Bypass em_step_loss_weight_dist if target_half_way enabled.
+    if(args.target_half_way):
+        weighted_loss_per_step = loss_per_step
+    else:
+        weighted_loss_per_step = loss_per_step * em_step_loss_weight_dist
     loss = torch.sum(weighted_loss_per_step)
 
     # Add the argmaxxed images to tensorboard
