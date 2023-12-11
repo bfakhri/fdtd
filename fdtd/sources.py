@@ -544,6 +544,7 @@ class CorticalColumnPlaneSource(PlaneSource):
         name: str = None,
         polarization: str = 'z',
         num_cortical_columns = 16,
+        source_stride=1,
     ):
         #super().__init__(period, amplitude, phase_shift, name, polarization)
         super().__init__(period, 0, phase_shift, name, polarization)
@@ -553,6 +554,7 @@ class CorticalColumnPlaneSource(PlaneSource):
         # Number of cortical columns to use
         self.num_ccs = num_cortical_columns
         self.cc_dirs = None
+        self.source_stride = source_stride 
         # Takes the field energies (E and  H) as input and outputs modifiers for each cc.
         self.nonlin_conv = torch.nn.Conv2d( 2, self.num_ccs, kernel_size=1, stride=1, padding='same')
 
@@ -592,7 +594,7 @@ class CorticalColumnPlaneSource(PlaneSource):
         osc = cc_amps * torch.sin(2 * pi * (q * self.max_freq * cc_freqs + cc_freqs * cc_phases))
 
         # Add perturbation to grid on the Z axis.
-        self.grid.E[self.x, self.y, :, -1][::8, ::8, ...] += osc[..., None]
+        self.grid.E[self.x, self.y, :, -1][::self.source_stride, ::self.source_stride, ...] += osc[..., None]
 
 
 

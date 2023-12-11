@@ -49,6 +49,8 @@ parser.add_argument('-gray', '--grayscale', default=False, action='store_true',
                     help='If set, will force the input and output images to be grayscale.')
 parser.add_argument('-thw', '--target-half-way', default=False, action='store_true',
                     help='If set, will only produce loss for the timestep halfway up the coverage ratio.')
+parser.add_argument('-sds', '--source-down-scaler', type=int, default=1, 
+                    help='How much to stride sources in the cortical substrate.')
 args = parser.parse_args()
 
 
@@ -148,7 +150,8 @@ grid[:, :, 0] = fdtd.PeriodicBoundary(name="zbounds")
 grid[bw:bw+ih,bw:bw+iw,0] = fdtd.CorticalColumnPlaneSource(
     period = WAVELENGTH / SPEED_LIGHT,
     polarization = 'x', # BS value, polarization is not used.
-    name='cc'
+    name = 'cc',
+    source_stride = args.source_down_scaler,
 )
 
 # Object defining the cortical column substrate 
@@ -168,7 +171,7 @@ if(args.grayscale):
     chans = 1
 else:
     chans = 3
-model = AutoEncoder(num_em_steps=em_steps, grid=grid, input_chans=chans, output_chans=chans, bypass_em=args.bypass_em).to(device)
+model = AutoEncoder(num_em_steps=em_steps, grid=grid, input_chans=chans, output_chans=chans, source_stride=args.source_down_scaler, bypass_em=args.bypass_em).to(device)
 print('All grid objects: ', [obj.name for obj in grid.objects])
 grid_params_to_learn = []
 grid_params_to_learn += [util.get_object_by_name(grid, 'xlow').inverse_permittivity]
