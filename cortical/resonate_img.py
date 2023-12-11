@@ -303,13 +303,13 @@ for train_step in range(start_step + 1, start_step + args.max_steps):
         # Calculate clipped metabolic loss. This keeps energy addition small.
         energy_E, energy_H = util.calculate_em_energy(em_field)
         # Normalize the energy by the size of the field.
-        energy_E, energy_H = (energy_E/em_field.numel(), energy_H/em_field.numel())
+        energy_E, energy_H = (energy_E/(em_field.numel()*em_steps), energy_H/(em_field.numel()*em_steps))
         energy_jump_E = energy_E - last_energy_E
         energy_jump_H = energy_H - last_energy_H
         E_energy_jump_list += [energy_jump_E]
         H_energy_jump_list += [energy_jump_H]
-        energy_E_loss = torch.relu(energy_jump_E - 1.0)
-        energy_H_loss = torch.relu(energy_jump_H - 1.0)
+        energy_E_loss = torch.relu(energy_jump_E - 0.1)
+        energy_H_loss = torch.relu(energy_jump_H - 0.1)
         energy_loss += energy_E_loss + energy_H_loss
         last_energy_E = energy_E
         last_energy_H = energy_H
@@ -388,6 +388,8 @@ for train_step in range(start_step + 1, start_step + args.max_steps):
     writer.add_histogram('yhigh', util.get_object_by_name(grid, 'yhigh').inverse_permittivity, train_step)
     writer.add_histogram('e_field', e_field_img, train_step)
     writer.add_histogram('h_field', h_field_img, train_step)
+    writer.add_histogram('e_field_energy_jumps', E_energy_jump_per_step, train_step)
+    writer.add_histogram('h_field_energy_jumps', H_energy_jump_per_step, train_step)
 
     optimizer.zero_grad()
     # Backprop
