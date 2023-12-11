@@ -581,14 +581,6 @@ class CorticalColumnPlaneSource(PlaneSource):
         cc_freqs = self.cc_activations[0, 1]
         cc_phases = self.cc_activations[0, 2]
 
-        ## Calculate energy of E and H fields.
-        #with torch.no_grad():
-        #    grid_energy_E = bd.sum(self.grid.E ** 2, -1)
-        #    grid_energy_H = bd.sum(self.grid.H ** 2, -1)
-        #    grid_energy = torch.stack([grid_energy_E, grid_energy_H], dim=0)
-        #    grid_energy = torch.permute(grid_energy, (3, 0, 1, 2))
-        #nonlin_modifier = torch.sigmoid(self.nonlin_conv(grid_energy))
-
         # Calculate the oscillation based on the amount of time passed.
         q = self.grid.time_steps_passed*self.grid.time_step
         osc = cc_amps * torch.sin(2 * pi * (q * self.max_freq * cc_freqs + cc_freqs * cc_phases))

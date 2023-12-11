@@ -86,3 +86,13 @@ def toy_img(img):
     img[..., x:x+s, y:y+s] = b
     return bd.array(img[:,0,...])
 
+def calculate_em_energy(em_field):
+    " Returns the energy of the total electric and magnetic fields "
+    e_field = em_field[0:3,...]
+    h_field = em_field[3:6,...]
+    with torch.no_grad():
+        grid_energy_E = bd.sum(bd.sum(e_field ** 2, -1))
+        grid_energy_H = bd.sum(bd.sum(h_field ** 2, -1))
+    return grid_energy_E, grid_energy_H
+
+

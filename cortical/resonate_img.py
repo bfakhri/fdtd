@@ -291,26 +291,54 @@ for train_step in range(start_step + 1, start_step + args.max_steps):
     optimizer.zero_grad()
 
     loss_list = []
+    E_energy_jump_list = []
+    H_energy_jump_list = []
+    energy_loss = 0
+    last_energy_E = 0
+    last_energy_H = 0 
     # Get sample from training data
     em_step_loss_weight_dist = softmax(loss_step_weights)
     argmax_step = torch.argmax(torch.squeeze(loss_step_weights))
     for em_step, (img_hat_em, em_field) in enumerate(model(img, summary_writer=writer, train_step=train_step)):
+        # Calculate clipped metabolic loss. This keeps energy addition small.
+        energy_E, energy_H = util.calculate_em_energy(em_field)
+        # Normalize the energy by the size of the field.
+        energy_E, energy_H = (energy_E/em_field.numel(), energy_H/em_field.numel())
+        energy_jump_E = energy_E - last_energy_E
+        energy_jump_H = energy_H - last_energy_H
+        E_energy_jump_list += [energy_jump_E]
+        H_energy_jump_list += [energy_jump_H]
+        energy_E_loss = torch.relu(energy_jump_E - 1.0)
+        energy_H_loss = torch.relu(energy_jump_H - 1.0)
+        energy_loss += energy_E_loss + energy_H_loss
+        last_energy_E = energy_E
+        last_energy_H = energy_H
         # Only add the last step to the loss if we half target_half_way enabled.
         if(args.target_half_way and em_step == em_steps-1):
             loss_list += [loss_fn(img_hat_em[None, ...], img)]
         else:
             loss_list += [loss_fn(img_hat_em[None, ...], img)]
+
+        # Save the em field and energy at the target step.
         if(em_step == argmax_step):
             e_field_img = em_field[0:3,...]
             h_field_img = em_field[3:6,...]
             img_hat_em_save = img_hat_em
+            e_field_energy_save = energy_E
+            h_field_energy_save = energy_H
     loss_per_step = torch.stack(loss_list)
+    E_energy_jump_per_step = torch.stack(E_energy_jump_list)
+    H_energy_jump_per_step = torch.stack(H_energy_jump_list)
     # Bypass em_step_loss_weight_dist if target_half_way enabled.
     if(args.target_half_way):
         weighted_loss_per_step = loss_per_step
     else:
         weighted_loss_per_step = loss_per_step * em_step_loss_weight_dist
-    loss = torch.sum(weighted_loss_per_step)
+
+    reconstruction_loss = torch.sum(weighted_loss_per_step) 
+
+    # Calculate the total loss
+    loss = reconstruction_loss + energy_loss
 
     # Add the argmaxxed images to tensorboard
     if(args.grayscale):
@@ -328,6 +356,14 @@ for train_step in range(start_step + 1, start_step + args.max_steps):
 
 
     writer.add_scalar('Total Loss', loss, train_step)
+    writer.add_scalar('Reconstruction Loss', reconstruction_loss, train_step)
+    writer.add_scalar('Metabolic Loss', energy_loss, train_step)
+    writer.add_scalar('Max E Energy Jump', bd.max(E_energy_jump_per_step), train_step)
+    writer.add_scalar('Max H Energy Jump', bd.max(H_energy_jump_per_step), train_step)
+    writer.add_scalar('Max E Energy Step', torch.argmax(E_energy_jump_per_step), train_step)
+    writer.add_scalar('Max H Energy Step', torch.argmax(H_energy_jump_per_step), train_step)
+    writer.add_scalar('Sample E Energy', e_field_energy_save, train_step)
+    writer.add_scalar('Sample H Energy', h_field_energy_save, train_step)
     writer.add_histogram('Loss Per Step', loss_per_step, train_step)
     writer.add_histogram('Weighted Loss Per Step', weighted_loss_per_step, train_step)
     writer.add_histogram('Loss EM Step Weights', loss_step_weights, train_step)
