@@ -35,7 +35,7 @@ parser.add_argument('-m', '--max-steps', type=int, default='1000000000000000',
                     help='How many steps to train.')
 parser.add_argument('-d', '--dry-run', type=bool, default=False,
                     help='If true, does not save model checkpoint.')
-parser.add_argument('-rog', '--reset-grid-optim', type=bool, default=False,
+parser.add_argument('-rog', '--reset-grid-optim', default=False, action='store_true',
                     help='If true, loads completely new params for the grid and optimizer.')
 parser.add_argument('-is', '--image-size', type=int, default=40,
                     help='Size of each side of the image. Determines grid size.')
@@ -51,6 +51,8 @@ parser.add_argument('-thw', '--target-half-way', default=False, action='store_tr
                     help='If set, will only produce loss for the timestep halfway up the coverage ratio.')
 parser.add_argument('-sds', '--source-down-scaler', type=int, default=1, 
                     help='How much to stride sources in the cortical substrate.')
+parser.add_argument('-sgd', '--use-sgd', default=False, action='store_true',
+                    help='If set, will switch to SGD instead of Adam. Useful for finetuning.')
 args = parser.parse_args()
 
 
@@ -263,7 +265,10 @@ if((grid_path is not None) and (not args.reset_grid_optim)):
 
 # Combine grid and model params and register them with the optimizer.
 params_to_learn = [*model.parameters()] + grid_params_to_learn
-optimizer = optim.AdamW(params_to_learn, lr=0.0001, betas=(0.9, 0.999), eps=1e-08, weight_decay=0.01, amsgrad=False)
+if(args.use_sgd):
+    optimizer = optim.SGD(params_to_learn, lr=0.01)
+else:
+    optimizer = optim.AdamW(params_to_learn, lr=0.0001, betas=(0.9, 0.999), eps=1e-08, weight_decay=0.01, amsgrad=False)
 if((not reset_optimizer) and (optimizer_path is not None) and (not args.reset_grid_optim)):
     print('INFO: Loading saved optimizer params...')
     optimizer.load_state_dict(torch.load(optimizer_path))
