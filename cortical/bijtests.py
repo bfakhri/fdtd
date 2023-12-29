@@ -16,6 +16,7 @@ import torch.optim as optim
 import torchvision
 from torchvision.utils import save_image
 from torch.utils.tensorboard import SummaryWriter
+from PIL import Image
 import scipy
 from autoencoder import AutoEncoder
 import argparse
@@ -115,9 +116,19 @@ train_loader = torch.utils.data.DataLoader(train_dataset,
 
 
 print('Grayscale: ', args.grayscale)
-sample = util.get_sample_img(train_loader, device, color=not args.grayscale)
-print('Image shape: ', sample.shape)
-ih, iw = tuple(sample.shape[2:4])
+#sample = util.get_sample_img(train_loader, device, color=not args.grayscale)
+img_file = img_paths[6]
+img = Image.open(img_file)
+img = image_transform(img)[None, ...]
+if(args.grayscale):
+    img = torchvision.transforms.Grayscale()(img)[None, 0, ...]
+else:
+    img = torchvision.transforms.Grayscale()(img)
+print('Image shape: ', img.shape)
+ih, iw = tuple(img.shape[2:4])
+print('ih, iw: ', ih, iw)
+testing = util.get_sample_img(train_loader, device, color=not args.grayscale)
+print('testing: ', testing.shape)
 
 # Physics constants
 WAVELENGTH = 1550e-9 # meters
@@ -289,10 +300,10 @@ grid.E.retain_grad()
 stopwatch = time.time()
 
 # Generate a new image
-img = util.get_sample_img(train_loader, device, color=not args.grayscale)
+#img = util.get_sample_img(train_loader, device, color=not args.grayscale)
 #img = torch.zeros_like(img)
 #img[:,:,0:40,0:40] = 1
-print(img.max(), img.min(), img.mean())
+#print(img.max(), img.min(), img.mean())
 #sys.exit()
 
 # Reset grid and optimizer
