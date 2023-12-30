@@ -55,6 +55,8 @@ parser.add_argument('-sds', '--source-down-scaler', type=int, default=1,
                     help='How much to stride sources in the cortical substrate.')
 parser.add_argument('-sgd', '--use-sgd', default=False, action='store_true',
                     help='If set, will switch to SGD instead of Adam. Useful for finetuning.')
+parser.add_argument('-ti', '--target-img', default=None, action='store_true',
+                    help='If set, will only process this image file.')
 args = parser.parse_args()
 
 def get_sorted_paths(directory_list, target_ext='.png'):
@@ -68,22 +70,6 @@ def get_sorted_paths(directory_list, target_ext='.png'):
 
 img_paths = get_sorted_paths(['./optical_illusions/'])
 
-# Setup tensorboard
-tb_parent_dir = './runs/'
-repo = git.Repo(search_parent_directories=True)
-sha = repo.head.object.hexsha
-#head = repo.head
-local_branch = repo.active_branch.name
-run_dir = 'test_outputs'
-print('TB Log Directory is: ', tb_parent_dir + run_dir)
-writer = SummaryWriter(log_dir=tb_parent_dir + run_dir)
-
-# Setup model saving
-model_parent_dir = './model_checkpoints/'
-model_checkpoint_dir = model_parent_dir + local_branch + '/'
-path = Path(model_checkpoint_dir)
-path.mkdir(parents=True, exist_ok=True)
-
 # ## Set Backend
 backend_name = "torch"
 fdtd.set_backend(backend_name)
@@ -95,19 +81,9 @@ else:
 image_transform = torchvision.transforms.Compose([
     torchvision.transforms.ToTensor(),
     torchvision.transforms.Resize((args.image_size*args.image_scaler, args.image_size*args.image_scaler))])
-train_dataset = torchvision.datasets.Flowers102('flowers102/', 
-                                           split='train',
-                                           download=True,
-                                           transform=image_transform)
-# Note - turn SHUFFLE back to TRUE for training on multiple images.
-train_loader = torch.utils.data.DataLoader(train_dataset,
-                                           batch_size=1, 
-                                           shuffle=True)
 
-
-print('Grayscale: ', args.grayscale)
-#sample = util.get_sample_img(train_loader, device, color=not args.grayscale)
-img_file = img_paths[6]
+img_file = img_paths[0]
+print(img_file.split('/')[-1].split('.')[0])
 img = Image.open(img_file)
 img = image_transform(img)[None, ...]
 if(args.grayscale):
@@ -117,8 +93,6 @@ else:
 print('Image shape: ', img.shape)
 ih, iw = tuple(img.shape[2:4])
 print('ih, iw: ', ih, iw)
-testing = util.get_sample_img(train_loader, device, color=not args.grayscale)
-print('testing: ', testing.shape)
 
 # Physics constants
 WAVELENGTH = 1550e-9 # meters
@@ -170,8 +144,6 @@ grid[bw:bw+ih,bw:bw+iw,0] = fdtd.CorticalColumnPlaneSource(
 
 # Object defining the cortical column substrate 
 grid[bw:-bw, bw:-bw, :] = fdtd.LearnableAnisotropicObject(permittivity=2.5, is_substrate=True, name="cc_substrate", device=device)
-# List all model checkpoints
-checkpoints = [f for f in listdir(model_checkpoint_dir) if(isfile(join(model_checkpoint_dir, f)) and f.endswith('.pt'))]
 
 torch.autograd.set_detect_anomaly(True)
 # The weights for the reconstruction loss at each em time step. 
@@ -203,7 +175,7 @@ grid_params_to_learn += [util.get_source_by_name(grid, 'cc').nonlin_conv.bias]
 grid_params_to_learn += [loss_step_weights]
 
 # Load saved params for model and optimizer.
-checkpoint_steps = [int(cf.split('_')[-1].split('.')[0]) for cf in checkpoints]
+#checkpoint_steps = [int(cf.split('_')[-1].split('.')[0]) for cf in checkpoints]
 if(args.load_file is not None):
     start_step = int(args.load_file.split('/')[-1].split('_')[-1].split('.')[0])
     print('Loading model {0}. Starting at step {1}.'.format(args.load_file, start_step))
@@ -289,16 +261,6 @@ grid.E.retain_grad()
 # For timing steps
 stopwatch = time.time()
 
-# Generate a new image
-#img = util.get_sample_img(train_loader, device, color=not args.grayscale)
-#img = torch.zeros_like(img)
-#img[:,:,0:40,0:40] = 1
-#print(img.max(), img.min(), img.mean())
-#sys.exit()
-
-# Reset grid and optimizer
-grid.reset()
-
 loss_list = []
 E_energy_jump_list = []
 H_energy_jump_list = []
@@ -308,46 +270,61 @@ last_energy_H = 0
 # Get sample from training data
 em_step_loss_weight_dist = softmax(loss_step_weights)
 argmax_step = torch.argmax(torch.squeeze(loss_step_weights))
-for em_step, (img_hat_em, em_field) in enumerate(model(img, summary_writer=writer, train_step=0)):
-    print('On em step: ', em_step, em_steps)
-    # Calculate clipped metabolic loss. This keeps energy addition small.
-    energy_E, energy_H = util.calculate_em_energy(em_field)
-    # Normalize the energy by the size of the field.
-    energy_E, energy_H = (energy_E/(em_field.numel()*em_steps), energy_H/(em_field.numel()*em_steps))
-    energy_jump_E = energy_E - last_energy_E
-    energy_jump_H = energy_H - last_energy_H
-    E_energy_jump_list += [energy_jump_E]
-    H_energy_jump_list += [energy_jump_H]
-    energy_E_loss = torch.relu(energy_jump_E - 0.1)
-    energy_H_loss = torch.relu(energy_jump_H - 0.1)
-    energy_loss += energy_E_loss + energy_H_loss
-    last_energy_E = energy_E
-    last_energy_H = energy_H
-    # Only add the last step to the loss if we half target_half_way enabled.
-    if(args.target_half_way and em_step == em_steps-1):
-        loss_list += [loss_fn(img_hat_em[None, ...], img)]
-    else:
-        loss_list += [loss_fn(img_hat_em[None, ...], img)]
 
-    # Save the em field and energy at the target step.
-    e_field_img = em_field[0:3,...]
-    h_field_img = em_field[3:6,...]
-    img_hat_em_save = img_hat_em
-    e_field_energy_save = energy_E
-    h_field_energy_save = energy_H
+# Only process one image if this is set
+if(args.target_img):
+    img_paths = [args.target_img]
 
-    loss_per_step = torch.stack(loss_list)
-    E_energy_jump_per_step = torch.stack(E_energy_jump_list)
-    H_energy_jump_per_step = torch.stack(H_energy_jump_list)
-
-    # Add the argmaxxed images to tensorboard
+for img_file in img_paths:
+    # Reset the grid
+    grid.reset()
+    # Load an image
+    img_name = img_file.split('/')[-1].split('.')[0]
+    print('Processing: ', img_name)
+    img = Image.open(img_file)
+    img = image_transform(img)[None, ...]
     if(args.grayscale):
-        img =  img.expand(-1, 3, -1, -1)
-        img_hat_em_save =  img_hat_em_save.expand(3, -1, -1)
-    img_grid = torchvision.utils.make_grid([img[0,...], img_hat_em_save,
-        util.norm_img_by_chan(e_field_img), 
-        util.norm_img_by_chan(h_field_img)])
-    writer.add_image('sample', img_grid, em_step)
-    save_image(img_grid, './images/img_idx{0}.png'.format(str(em_step).zfill(12)))
+        img = torchvision.transforms.Grayscale()(img)[None, 0, ...]
+    else:
+        img = torchvision.transforms.Grayscale()(img)
+    for em_step, (img_hat_em, em_field) in enumerate(model(img, summary_writer=None, train_step=0)):
+        print(img_name, '\tem step: ', em_step, em_steps)
+        # Calculate clipped metabolic loss. This keeps energy addition small.
+        energy_E, energy_H = util.calculate_em_energy(em_field)
+        # Normalize the energy by the size of the field.
+        energy_E, energy_H = (energy_E/(em_field.numel()*em_steps), energy_H/(em_field.numel()*em_steps))
+        energy_jump_E = energy_E - last_energy_E
+        energy_jump_H = energy_H - last_energy_H
+        E_energy_jump_list += [energy_jump_E]
+        H_energy_jump_list += [energy_jump_H]
+        energy_E_loss = torch.relu(energy_jump_E - 0.1)
+        energy_H_loss = torch.relu(energy_jump_H - 0.1)
+        energy_loss += energy_E_loss + energy_H_loss
+        last_energy_E = energy_E
+        last_energy_H = energy_H
+        # Only add the last step to the loss if we half target_half_way enabled.
+        if(args.target_half_way and em_step == em_steps-1):
+            loss_list += [loss_fn(img_hat_em[None, ...], img)]
+        else:
+            loss_list += [loss_fn(img_hat_em[None, ...], img)]
 
-writer.close()
+        # Save the em field and energy at the target step.
+        e_field_img = em_field[0:3,...]
+        h_field_img = em_field[3:6,...]
+        img_hat_em_save = img_hat_em
+        e_field_energy_save = energy_E
+        h_field_energy_save = energy_H
+
+        loss_per_step = torch.stack(loss_list)
+        E_energy_jump_per_step = torch.stack(E_energy_jump_list)
+        H_energy_jump_per_step = torch.stack(H_energy_jump_list)
+
+        # Add the argmaxxed images to tensorboard
+        if(args.grayscale):
+            img =  img.expand(-1, 3, -1, -1)
+            img_hat_em_save =  img_hat_em_save.expand(3, -1, -1)
+        img_grid = torchvision.utils.make_grid([img[0,...], img_hat_em_save,
+            util.norm_img_by_chan(e_field_img), 
+            util.norm_img_by_chan(h_field_img)])
+        save_image(img_grid, './images/{0}_step_{1}.png'.format(img_name, str(em_step).zfill(12)))
+
