@@ -30,14 +30,14 @@ def get_object_by_name(grid, name):
         if(obj.name == name):
             return obj
     else:
-        print('Could not find object: ', name)
+        raise Exception('Could not find object: {0}'.format(name))
         sys.exit()
 def get_source_by_name(grid, name):
     for src in grid.sources:
         if(src.name == name):
             return src 
     else:
-        print('Could not find object: ', name)
+        raise Exception('Could not find object: {0}'.format(name))
         sys.exit()
 
 def norm_img_by_chan(img):
