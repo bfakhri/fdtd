@@ -301,6 +301,9 @@ if TORCH_AVAILABLE:
             else:
                 return numpy.asarray(arr)
 
+        roll = staticmethod(torch.roll)
+        """ Shift matrix along axes """
+
     # Torch Cuda Backend
     if TORCH_CUDA_AVAILABLE:
 
