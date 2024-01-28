@@ -23,7 +23,7 @@ from os import listdir
 from os.path import isfile, join
 from PIL import Image
 import pickle
-import cv2
+import matplotlib.pyplot as plt
 
 parser = argparse.ArgumentParser(description='Process args.')
 parser.add_argument('-f', '--load-file', type=str, default=None,
@@ -48,6 +48,17 @@ def get_sorted_paths(directory_list, target_ext='.png'):
     return path_list
 
 img_paths = get_sorted_paths(['./optical_illusions/'])
+
+#TODO - move this to a util file next cleanup
+def get_sample_img(img_loader, color=True):
+    _, (example_datas, labels) = next(enumerate(img_loader))
+    if(color):
+        sample = example_datas[0]
+        sample = sample.to(device)[None, :]
+    else:
+        sample = example_datas[0][0]
+        sample = sample.to(device)[None, None, :]
+    return sample
 
 def get_object_by_name(grid, name):
     for obj in grid.objects:
@@ -75,6 +86,14 @@ def norm_img_by_chan(img):
     chans_dynamic_range = chan_maxes - chan_mins
     normed_img = (img - chan_mins[...,None])/(chans_dynamic_range[...,None])
     return normed_img 
+
+class RandomRot90:
+    # Randomly rotates the image by multiples of 90 degrees.
+    def __init__(self):
+        pass
+
+    def __call__(self, sample):
+        return torch.rot90(sample, k=random.randrange(4), dims=[1, 2])
 
 # Setup model saving
 model_parent_dir = './model_checkpoints/'
@@ -208,6 +227,20 @@ else:
         optimizer_path = None
         grid_path = None
 
+def toy_img(img):
+    img = torch.zeros_like(img)
+    x, y, b, s = np.random.rand(4)
+    max_size = 14
+    min_size =  6
+    max_b = 1.0
+    min_b = 0.5
+    x = int(x*(img.shape[-1] - max_size))
+    y = int(y*(img.shape[-2] - max_size))
+    b = float(min_b + b*(max_b - min_b))
+    s = int(min_size + s*(max_size - min_size))
+    img[..., x:x+s, y:y+s] = b
+    return bd.array(img[:,0,...])
+
 reset_optimizer = False
 if((grid_path is not None)):
     print('Loading grid params...')
@@ -247,91 +280,45 @@ if((grid_path is not None)):
 
 # Combine grid and model params and register them with the optimizer.
 
-argmax_step = torch.argmax(torch.squeeze(loss_step_weights))
-
 # Array of EM powers by illusion by time step
+power_graph = {}
 with torch.inference_mode():
     # Add images to tensorboard
     for img_idx, img_file in enumerate(img_paths):
-        # Get the path of the test strip
-        illusion_path, illusion_filename = img_file.rsplit('/', 1)
-        test_strip_pref = illusion_path + '/test_strips/' + illusion_filename.split('.')[0]
-        test_strip_file_a = test_strip_pref + '_teststrip_part_a.png'
-        test_strip_file_b = test_strip_pref + '_teststrip_part_b.png'
-        print('Opening image {0} with test strip file {1}'.format(img_file, test_strip_file_a))
+        power_graph[img_file] = {'E': [], 'H': []}
         img = Image.open(img_file)
         img = image_transform(img)[None, ...]
         if(args.grayscale):
             img = torchvision.transforms.Grayscale()(img)[0, ...]
         else:
             img = torchvision.transforms.Grayscale()(img)
-        try:
-            test_strip_img_a = np.array(Image.open(test_strip_file_a))
-        except:
-            print('Could not find {0}, skipping'.format(test_strip_file_a))
-            continue
-        try:
-            test_strip_img_b = np.array(Image.open(test_strip_file_b))
-        except:
-            print('Could not find {0}, making zeros.'.format(test_strip_file_b))
-            test_strip_img_b = np.zeros_like(test_strip_img_a)
-        # Make sure it is binary.
-        assert np.sum(((test_strip_img_a > 0) * (test_strip_img_a < 1)).astype(np.int)) <= 0
-        assert np.sum(((test_strip_img_b > 0) * (test_strip_img_b < 1)).astype(np.int)) <= 0
-        test_strip_img_a = image_transform(test_strip_img_a)[None, ...]
-        test_strip_img_b = image_transform(test_strip_img_b)[None, ...]
-        # Re-binarize after the resize.
-        test_strip_img_a = (test_strip_img_a > 0.5).float()
-        test_strip_img_b = (test_strip_img_b > 0.5).float()
-        print('Test strip stats: ', torch.mean(test_strip_img_a), torch.min(test_strip_img_a), torch.max(test_strip_img_a))
-        print('Test strip stats: ', torch.mean(test_strip_img_b), torch.min(test_strip_img_b), torch.max(test_strip_img_b))
+        print(img_file, img.shape)
         # Reset grid
         grid.reset()
         for em_step, (img_hat_em, em_field) in enumerate(model(img)):
-            print('Generating image for illusion {0} and em step {1}'.format(img_idx, em_step))
+            print('Generating image for illusion {0} and em step {1}'.format(img_idx, em_step), end='\r')
             # Process outputs
             e_field_img = em_field[0:3,...]
             h_field_img = em_field[3:6,...]
+            plt.hist(torch.flatten(e_field_img))
+            #plt.show()
+            plt.draw()
+            plt.pause(0.001)
+            power_graph[img_file]['E'] += [torch.sum(e_field_img**2).numpy()]
+            power_graph[img_file]['H'] += [torch.sum(h_field_img**2).numpy()]
             if(args.grayscale):
                 img_hat_em =  img_hat_em.expand(3, -1, -1)
                 img_out =  img.expand(3, -1, -1)[None, ...]
             else:
                 img_out = img
-            # Generate the grid.
+            # Write to TB
             img_grid = torchvision.utils.make_grid([img_out[0,...], img_hat_em,
                 norm_img_by_chan(e_field_img), 
                 norm_img_by_chan(h_field_img)])
             img_grid = torchvision.transforms.functional.resize(img_grid, size=(img_grid.shape[1] * 4, img_grid.shape[2] * 4), interpolation=torchvision.transforms.InterpolationMode.NEAREST)
 
-            if(em_step >= argmax_step):
-                # Converting to grayscale and choose how many channels.
-                if(args.grayscale):
-                    img_hat_em = torchvision.transforms.Grayscale()(img_hat_em)[0, ...]
-                else:
-                    img_hat_em = torchvision.transforms.Grayscale()(img_hat_em)
-                # Mask the image
-                masked_output_a = test_strip_img_a * torch.unsqueeze(img_hat_em, 0)
-                masked_output_b = test_strip_img_b * torch.unsqueeze(img_hat_em, 0)
-                print(torch.permute(test_strip_img_a[0], (1, 2, 0)).numpy().shape)
-                cv2.imshow('test_a', torch.permute(test_strip_img_a[0], (1, 2, 0)).numpy())
-                cv2.imshow('test_b', torch.permute(test_strip_img_b[0], (1, 2, 0)).numpy())
-                cv2.imshow('masked_output_a', torch.permute(masked_output_a[0], (1, 2, 0)).numpy())
-                cv2.imshow('masked_output_b', torch.permute(masked_output_b[0], (1, 2, 0)).numpy())
-                # Sum the result over the y dimension.
-                masked_output_a = torch.squeeze(masked_output_a)
-                masked_output_b = torch.squeeze(masked_output_b)
-                masked_output_a = torch.sum(masked_output_a, axis=-2)
-                masked_output_b = torch.sum(masked_output_b, axis=-2)
-                # Sum the input image over the y dimension.
-                input_img_masked_sum = test_strip_img_a * img
-                input_img_masked_sum = torch.squeeze(input_img_masked_sum)
-                input_img_masked_sum = torch.sum(input_img_masked_sum, axis=-2)
-                cv2.imshow('frame3', img_hat_em.numpy())
-                plt.plot(masked_output_a)
-                plt.plot(input_img_masked_sum)
-                plt.show()
-                cv2.waitKey()
-                break
+            save_image(img_grid, './images/img_p{0}_idx{1}.png'.format('{0:06.3f}'.format(img_idx), str(em_step).zfill(12)))
 
-            #save_image(img_grid, './images/img_p{0}_idx{1}.png'.format('{0:06.3f}'.format(img_idx), str(em_step).zfill(12)))
 
+#with open('./power_graph.pkl', 'wb') as f:
+#    pickle.dump(power_graph, f)

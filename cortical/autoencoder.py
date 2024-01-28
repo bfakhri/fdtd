@@ -50,7 +50,7 @@ class AutoEncoder(nn.Module):
         em_plane = torch.permute(torch.squeeze(em_plane), (2,0,1))
         return em_plane
 
-    def forward(self, x, em_steps=None, amp_scaler=1.0, summary_writer=None, train_step=None):
+    def forward(self, x, em_steps=None, amp_scaler=1.0, summary_writer=None, train_step=None, output_scaler=None):
         ## 1 - Extract features
         # Convert image into amplitude, frequency, and phase shift for our CCs.
         x = self.conv1(x)
@@ -108,4 +108,9 @@ class AutoEncoder(nn.Module):
                 self.em_grid.run(1 , progress_bar=False)
                 em_plane = self.get_em_plane()
                 x_hat_em = torch.sigmoid(self.conv_linear(em_plane))
-                yield x_hat_em, em_plane
+                if(output_scaler):
+                    x_hat_em = torchvision.transforms.functional.resize(x_hat_em, size=(x_hat_em.shape[1] * output_scaler, x_hat_em.shape[2] * output_scaler), interpolation=torchvision.transforms.InterpolationMode.NEAREST)
+                    em_plane = torchvision.transforms.functional.resize(em_plane, size=(em_plane.shape[1] * output_scaler, em_plane.shape[2] * output_scaler), interpolation=torchvision.transforms.InterpolationMode.NEAREST)
+                    yield x_hat_em, em_plane
+                else:
+                    yield x_hat_em, em_plane
