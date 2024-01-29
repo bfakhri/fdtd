@@ -173,19 +173,28 @@ else:
 model = AutoEncoder(num_em_steps=em_steps, grid=grid, input_chans=chans, output_chans=chans, source_stride=args.source_down_scaler, bypass_em=args.bypass_em).to(device)
 print('All grid objects: ', [obj.name for obj in grid.objects])
 grid_params_to_learn = []
-# Nonlinearity weights for the cortical columns. 
-grid_params_to_learn += [util.get_source_by_name(grid, 'cc').nonlin_conv.weight]
-grid_params_to_learn += [util.get_source_by_name(grid, 'cc').nonlin_conv.bias]
 # The weights for the loss.
 grid_params_to_learn += [loss_step_weights]
 
 # Load saved params for model and optimizer.
+reset_optimizer = False
 if(args.load_file is not None):
     start_step = int(args.load_file.split('/')[-1].split('_')[-1].split('.')[0])
     print('Loading model {0}. Starting at step {1}.'.format(args.load_file, start_step))
     optimizer_path = args.load_file.rsplit('.', 1)[0] + '.opt'
     grid_path = args.load_file.rsplit('.', 1)[0] + '.grd'
     model.load_state_dict(torch.load(args.load_file))
+    # Load grid params and interpolate them if necessary
+    with torch.no_grad():
+        load_grid_params_to_learn = torch.load(grid_path)
+        for idx, tensor in enumerate(load_grid_params_to_learn):
+            if(tensor.shape == grid_params_to_learn[idx][...].shape):
+                grid_params_to_learn[idx][...] = tensor[...]
+                print('Loaded grid param {0} with shape: {1}'.format(idx, tensor.shape)) 
+            else:
+                # Interpolate the thing....
+                print('INFO: Shapes are mismatched: {0} vs {1}'.format(tensor[...].shape, grid_params_to_learn[idx][...].shape))
+                reset_optimizer = True
 else:
     print('Starting model at step 0')
     start_step = 0
@@ -198,7 +207,7 @@ if(args.use_sgd):
     optimizer = optim.SGD(params_to_learn, lr=0.01)
 else:
     optimizer = optim.AdamW(params_to_learn, lr=0.0001, betas=(0.9, 0.999), eps=1e-08, weight_decay=0.01, amsgrad=False)
-if((optimizer_path is not None) and (not args.reset_grid_optim)):
+if((optimizer_path is not None) and (not reset_optimizer) and (not args.reset_grid_optim)):
     print('INFO: Loading saved optimizer params...')
     optimizer.load_state_dict(torch.load(optimizer_path))
 else:
@@ -303,8 +312,6 @@ for train_step in range(start_step + 1, start_step + args.max_steps):
 
     # Tensorboard
     writer.add_histogram('sm_conv_lin', model.sm_conv_linear.weight, train_step)
-    writer.add_histogram('cc_nonlin_w', util.get_source_by_name(grid, 'cc').nonlin_conv.weight, train_step)
-    writer.add_histogram('cc_nonlin_b', util.get_source_by_name(grid, 'cc').nonlin_conv.bias, train_step)
     writer.add_histogram('e_field', e_field_img, train_step)
     writer.add_histogram('h_field', h_field_img, train_step)
     writer.add_histogram('e_field_energy_jumps', E_energy_jump_per_step, train_step)
