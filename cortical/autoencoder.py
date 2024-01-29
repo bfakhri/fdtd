@@ -78,25 +78,7 @@ class AutoEncoder(nn.Module):
         cc_activations[:,2] = torch.sigmoid(cc_activations[:, 2])
 
         # Branch to substrate manipulation. Compress it to (0.1, 1.0) for stability.
-        print(self.sm_conv_linear.weight._version)
-        print(self.sm_conv_linear.weight._version)
-        print(self.sm_conv_linear.weight._version)
-        print(self.sm_conv_linear.weight._version)
-        print(self.sm_conv_linear.weight._version)
-        print(self.sm_conv_linear.weight._version)
-        print(self.sm_conv_linear.weight._version)
-        print(self.sm_conv_linear.weight._version)
-        print(self.sm_conv_linear.weight._version)
         sm_activations = 0.9*torch.sigmoid(self.sm_conv_linear(x)) + 0.1
-        print(self.sm_conv_linear.weight._version)
-        print(self.sm_conv_linear.weight._version)
-        print(self.sm_conv_linear.weight._version)
-        print(self.sm_conv_linear.weight._version)
-        print(self.sm_conv_linear.weight._version)
-        print(self.sm_conv_linear.weight._version)
-        print(self.sm_conv_linear.weight._version)
-        print(self.sm_conv_linear.weight._version)
-        print(self.sm_conv_linear.weight._version)
 
         # Write out summary if the writer is present
         if(summary_writer is not None):
