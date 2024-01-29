@@ -28,7 +28,7 @@ from . import constants as const
 ## Functions
 def curl_E(E: Tensorlike) -> Tensorlike:
     """Transforms an E-type field into an H-type field by performing a curl
-    operation
+    operation. Edges wrap around the simulation's boundaries.
 
     Args:
         E: Electric field to take the curl of (E-type field located on the
@@ -39,27 +39,21 @@ def curl_E(E: Tensorlike) -> Tensorlike:
     """
     curl = bd.zeros(E.shape)
 
-    #curl[:, :-1, :, 0] += E[:, 1:, :, 2] - E[:, :-1, :, 2]
-    #curl[:, :, :-1, 0] -= E[:, :, 1:, 1] - E[:, :, :-1, 1]
-    curl[:, :, :, 0] += bd.roll(E[..., 2], -1, 1) - E[..., 2]
-    curl[:, :, :, 0] -= bd.roll(E[..., 1], -1, 2) - E[..., 1]
+    curl[..., 0] += bd.roll(E[..., 2], -1, 1) - E[..., 2]
+    curl[..., 0] -= bd.roll(E[..., 1], -1, 2) - E[..., 1]
 
-    #curl[:, :, :-1, 1] += E[:, :, 1:, 0] - E[:, :, :-1, 0]
-    #curl[:-1, :, :, 1] -= E[1:, :, :, 2] - E[:-1, :, :, 2]
-    curl[:, :, :, 1] += bd.roll(E[..., 0], -1, 2) - E[..., 0]
-    curl[:, :, :, 1] -= bd.roll(E[..., 2], -1, 0) - E[..., 2]
+    curl[..., 1] += bd.roll(E[..., 0], -1, 2) - E[..., 0]
+    curl[..., 1] -= bd.roll(E[..., 2], -1, 0) - E[..., 2]
 
-    #curl[:-1, :, :, 2] += E[1:, :, :, 1] - E[:-1, :, :, 1]
-    #curl[:, :-1, :, 2] -= E[:, 1:, :, 0] - E[:, :-1, :, 0]
-    curl[:, :, :, 2] += bd.roll(E[..., 1], -1, 0) - E[..., 1]
-    curl[:, :, :, 2] -= bd.roll(E[..., 0], -1, 1) - E[..., 0]
+    curl[..., 2] += bd.roll(E[..., 1], -1, 0) - E[..., 1]
+    curl[..., 2] -= bd.roll(E[..., 0], -1, 1) - E[..., 0]
 
     return curl
 
 
 def curl_H(H: Tensorlike) -> Tensorlike:
     """Transforms an H-type field into an E-type field by performing a curl
-    operation
+    operation. Edges wrap around the simulation's boundaries.
 
     Args:
         H: Magnetic field to take the curl of (H-type field located on half-integer grid points)
@@ -70,14 +64,14 @@ def curl_H(H: Tensorlike) -> Tensorlike:
     """
     curl = bd.zeros(H.shape)
 
-    curl[:, 1:, :, 0] += H[:, 1:, :, 2] - H[:, :-1, :, 2]
-    curl[:, :, 1:, 0] -= H[:, :, 1:, 1] - H[:, :, :-1, 1]
+    curl[..., 0] +=  H[..., 2] - bd.roll(H[..., 2], +1, 1)
+    curl[..., 0] -=  H[..., 1] - bd.roll(H[..., 1], +1, 2)
 
-    curl[:, :, 1:, 1] += H[:, :, 1:, 0] - H[:, :, :-1, 0]
-    curl[1:, :, :, 1] -= H[1:, :, :, 2] - H[:-1, :, :, 2]
+    curl[..., 1] +=  H[..., 0] - bd.roll(H[..., 0], +1, 2)
+    curl[..., 1] -=  H[..., 2] - bd.roll(H[..., 2], +1, 0)
 
-    curl[1:, :, :, 2] += H[1:, :, :, 1] - H[:-1, :, :, 1]
-    curl[:, 1:, :, 2] -= H[:, 1:, :, 0] - H[:, :-1, :, 0]
+    curl[..., 2] +=  H[..., 1] - bd.roll(H[..., 1], +1, 0)
+    curl[..., 2] -=  H[..., 0] - bd.roll(H[..., 0], +1, 1)
 
     return curl
 
