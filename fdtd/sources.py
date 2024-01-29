@@ -555,8 +555,6 @@ class CorticalColumnPlaneSource(PlaneSource):
         self.num_ccs = num_cortical_columns
         self.cc_dirs = None
         self.source_stride = source_stride 
-        # Takes the field energies (E and  H) as input and outputs modifiers for each cc.
-        self.nonlin_conv = torch.nn.Conv2d( 2, self.num_ccs, kernel_size=1, stride=1, padding='same')
 
     def seed(self, cc_activations, max_freq):
         #TODO: this description is out of date, fix it.
