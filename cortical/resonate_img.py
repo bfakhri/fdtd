@@ -141,10 +141,6 @@ print('Time steps the grid will run for: ', em_steps)
 
 
 # Create PML boundaries
-#grid[  0: bw, :, :] = fdtd.PML(name="pml_xlow")
-#grid[-bw:   , :, :] = fdtd.PML(name="pml_xhigh")
-#grid[:,  0: bw,  :] = fdtd.PML(name="pml_ylow")
-#grid[:,-bw:   ,  :] = fdtd.PML(name="pml_yhigh")
 grid[:, :, 0] = fdtd.PeriodicBoundary(name="zbounds")
 
 # Creat the cortical column sources
@@ -175,6 +171,9 @@ print('All grid objects: ', [obj.name for obj in grid.objects])
 grid_params_to_learn = []
 # The weights for the loss.
 grid_params_to_learn += [loss_step_weights]
+# Nonlinearity weights for the substrate.
+grid_params_to_learn += [util.get_object_by_name(grid, 'cc_substrate').nonlin_conv.weight]
+grid_params_to_learn += [util.get_object_by_name(grid, 'cc_substrate').nonlin_conv.bias]
 
 # Load saved params for model and optimizer.
 reset_optimizer = False
@@ -304,6 +303,8 @@ for train_step in range(start_step + 1, start_step + args.max_steps):
     writer.add_histogram('Loss Per Step', loss_per_step, train_step)
     writer.add_histogram('Weighted Loss Per Step', weighted_loss_per_step, train_step)
     writer.add_histogram('Loss EM Step Weights', loss_step_weights, train_step)
+    writer.add_histogram('ccsubstrate_nonlin_w', util.get_object_by_name(grid, 'cc_substrate').nonlin_conv.weight, train_step)
+    writer.add_histogram('ccsubstrate_nonlin_b', util.get_object_by_name(grid, 'cc_substrate').nonlin_conv.bias, train_step)
     writer.add_scalar('em_steps', em_steps, train_step)
     writer.add_scalar('Argmax EM Step', argmax_step, train_step)
     writer.add_scalar('Argmax EM Step Ratio', argmax_step/em_steps, train_step)
