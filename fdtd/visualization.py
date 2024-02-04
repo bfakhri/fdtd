@@ -348,19 +348,20 @@ def visualize(
     plt.imshow(bd.numpy(grid_color.detach()), interpolation="sinc")
 
     # finalize the plot
-    if(not clean_img):
+    if(clean_img):
+        plt.axis('off')
+    else:
         plt.ylabel(xlabel)
         plt.xlabel(ylabel)
         plt.ylim(Nx, -1)
         plt.xlim(-1, Ny)
         plt.figlegend()
-    else:
-        plt.axis('off')
     plt.tight_layout()
 
     # save frame (require folder path and index)
     if save:
-        plt.savefig(os.path.join(folder, f"file{str(index).zfill(4)}.png"))
+        plt.savefig(os.path.join(folder, f"file{str(index).zfill(4)}.png"), bbox_inches='tight')
+
 
     # show if not animating
     if show:
