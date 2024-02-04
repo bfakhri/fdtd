@@ -44,6 +44,7 @@ def visualize(
     index=None,  # index for each frame of animation (visualize fn runs in a loop, loop variable is passed as index)
     save=False,  # True to save frames (requires parameters index, folder)
     folder=None,  # folder path to save frames
+    clean_img=True,  # if set will not add axes and legend to plot
 ):
     """visualize a projection of the grid and the optical energy inside the grid
 
@@ -347,11 +348,14 @@ def visualize(
     plt.imshow(bd.numpy(grid_color.detach()), interpolation="sinc")
 
     # finalize the plot
-    plt.ylabel(xlabel)
-    plt.xlabel(ylabel)
-    plt.ylim(Nx, -1)
-    plt.xlim(-1, Ny)
-    plt.figlegend()
+    if(not clean_img):
+        plt.ylabel(xlabel)
+        plt.xlabel(ylabel)
+        plt.ylim(Nx, -1)
+        plt.xlim(-1, Ny)
+        plt.figlegend()
+    else:
+        plt.axis('off')
     plt.tight_layout()
 
     # save frame (require folder path and index)
