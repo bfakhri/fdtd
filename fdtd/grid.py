@@ -50,7 +50,6 @@ def curl_E(E: Tensorlike) -> Tensorlike:
 
     return curl
 
-
 def curl_H(H: Tensorlike) -> Tensorlike:
     """Transforms an H-type field into an E-type field by performing a curl
     operation. Edges wrap around the simulation's boundaries.

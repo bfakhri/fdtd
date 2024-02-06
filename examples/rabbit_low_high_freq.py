@@ -9,8 +9,6 @@ from PIL import Image
 import torch
 import numpy as np
 
-
-
 # ## Set Backend
 #fdtd.set_backend("numpy")
 fdtd.set_backend("torch")
@@ -21,9 +19,10 @@ WAVELENGTH = 1550e-9 # For resolution purposes.
 SPEED_LIGHT: float = 299_792_458.0  # [m/s] speed of light
 
 # Frequency of the brainwaves.
+BRAIN_FREQ = 3400000000000.0 # Hz
 #BRAIN_FREQ = 34000000000000.0 # Hz
 #BRAIN_FREQ = 3400000000000000.0 # Hz
-BRAIN_FREQ = 3400000000.0 # Hz
+#BRAIN_FREQ = 3400000000.0 # Hz
 
 
 # ## Simulation
@@ -37,7 +36,8 @@ grid = fdtd.Grid(
     #(1.5e-5, 1.5e-5, 1),
     #(1.0e-5, 1.0e-5, 1), # Good ratios
     #(1.5e-4, 1.5e-4, 1),
-    (2.5e-5, 2.5e-5, 1),
+    #(2.5e-5, 2.5e-5, 1),
+    (4.5e-5, 4.5e-5, 1),
     grid_spacing=0.1 * WAVELENGTH,
     permittivity=1.0,
     permeability=1.0,
@@ -51,13 +51,13 @@ print('Grid Shape: ', grid.shape)
 # In[5]:
 
 
-# grid[0, :, :] = fdtd.PeriodicBoundary(name="xbounds")
-grid[0:10, :, :] = fdtd.PML(name="pml_xlow")
-grid[-10:, :, :] = fdtd.PML(name="pml_xhigh")
-
-# grid[:, 0, :] = fdtd.PeriodicBoundary(name="ybounds")
-grid[:, 0:10, :] = fdtd.PML(name="pml_ylow")
-grid[:, -10:, :] = fdtd.PML(name="pml_yhigh")
+## grid[0, :, :] = fdtd.PeriodicBoundary(name="xbounds")
+#grid[0:10, :, :] = fdtd.PML(name="pml_xlow")
+#grid[-10:, :, :] = fdtd.PML(name="pml_xhigh")
+#
+## grid[:, 0, :] = fdtd.PeriodicBoundary(name="ybounds")
+#grid[:, 0:10, :] = fdtd.PML(name="pml_ylow")
+#grid[:, -10:, :] = fdtd.PML(name="pml_yhigh")
 
 grid[:, :, 0] = fdtd.PeriodicBoundary(name="zbounds")
 
@@ -90,8 +90,16 @@ grid[10:ye, xe-1, 0] = fdtd.LineSource(
 midpoint_y = grid.shape[0]//2
 midpoint_x = grid.shape[1]//2
 size = 20
+#grid[ midpoint_y, midpoint_x, 0] = fdtd.PointSource(
+#    period=1.0 / BRAIN_FREQ, name="pointsource", amplitude=0.01,
+#    pulse=True, hanning_dt= 1.0/BRAIN_FREQ
+#)
 #grid[ size + 10, size+10, 0] = fdtd.PointSource(
-#    period=1.0 / BRAIN_FREQ, name="pointsource"
+#    period=1.0 / BRAIN_FREQ, name="pointsource",
+#    pulse=True#, hanning_dt= 10.0/BRAIN_FREQ
+#)
+#grid[ size + 10, -size+10, 0] = fdtd.PointSource(
+#    period=1.0 / BRAIN_FREQ, name="pointsource2"
 #)
 #grid[ midpoint_y, midpoint_x, 0] = fdtd.PointSource(
 #    period=1.0 / BRAIN_FREQ, name="pointsource"
@@ -121,8 +129,9 @@ input('klj')
 #iimg = torch.ones(9, yl, xl)
 #iimg = torch.ones(9, yl, xl) * 100
 iimg = torch.from_numpy(image) * 100 + 1
+print(iimg)
 #iimg[:, midpoint_y:midpoint_y + size, midpoint_x:midpoint_x + size] = 10
-grid.objects[0].seed(iimg)
+grid.objects[0].seed(1.0/iimg)
 
 # grid[midpoint_y, midpoint_x, 0] = fdtd.PointSource(
 #     period=WAVELENGTH2 / SPEED_LIGHT, amplitude=0.001, name="pointsource0"
@@ -131,15 +140,19 @@ grid.objects[0].seed(iimg)
 # ## Run simulation
 
 # ## Visualization
+torch.set_grad_enabled(False)
+
 
 
 grid.visualize(z=0, animate=True, norm="log")
-vis_steps = 1
+#vis_steps = 20
+vis_steps = 15
 step = 0
 for i in range(1000000):
     grid.run(vis_steps, progress_bar=False)
     #grid.visualize(z=0, norm='log', animate=True)
-    grid.visualize(z=0, norm='log', animate=True, objcolor=(0, 0, 0, 0), objedgecolor=(1,1,1,1), plot_both_fields=False, save=True, folder='./sim_frames/', index=i)
+    #grid.visualize(z=0, norm='log', animate=True, objcolor=(0, 0, 0, 0), objedgecolor=(1,1,1,1), plot_both_fields=False, save=True, folder='./sim_frames/', index=i)
+    grid.visualize(z=0, norm='log', animate=True, objcolor=(0, 0, 0, 0), objedgecolor=(1,1,1,0), plot_both_fields=False, save=True, folder='./sim_frames/', index=i, clean_img=True)
     plt.show()
     step += vis_steps
     print('On step: ', step)

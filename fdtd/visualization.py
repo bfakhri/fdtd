@@ -338,7 +338,7 @@ def visualize(
     else:
         # Blue is electric field, green is magnetic field.
         grid_color[..., 2], mask_E = visnorm(grid_energy_E)
-        grid_color[..., 0], mask_H = visnorm(grid_energy_H)
+        grid_color[..., 1], mask_H = visnorm(grid_energy_H)
         #mask = mask_E*mask_H
         mask = ((grid_energy_E + grid_energy_H) > 1e-6)
     
