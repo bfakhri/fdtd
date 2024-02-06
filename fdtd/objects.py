@@ -291,6 +291,7 @@ class LearnableAnisotropicObject(Object):
         self.nonlin_conv = torch.nn.Conv2d( 2, 3*3, kernel_size=1, stride=1, padding='same', device=self.device)
         self.is_substrate = is_substrate
         self.sm_activations = None
+        self.min_nonlin_mod = 0.2
 
     def _register_grid(
         self, grid: Grid, x: slice = None, y: slice = None, z: slice = None
@@ -336,7 +337,7 @@ class LearnableAnisotropicObject(Object):
                 grid_energy_H = bd.sum(self.grid.H[self.x, self.y, self.z] ** 2, -1)
                 grid_energy = torch.stack([grid_energy_E, grid_energy_H], dim=0)
                 grid_energy = torch.permute(grid_energy, (3, 0, 1, 2))
-            nonlin_modifier = torch.sigmoid(self.nonlin_conv(grid_energy))
+            nonlin_modifier = (1.0-self.min_nonlin_mod)*torch.sigmoid(self.nonlin_conv(grid_energy)) + self.min_nonlin_mod
             s = (1, 3, 3) + tuple(nonlin_modifier.shape[-2:])
             nonlin_modifier = torch.reshape(nonlin_modifier, s)
             nonlin_modifier = torch.permute(nonlin_modifier, (3, 4, 0, 1, 2))
