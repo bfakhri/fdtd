@@ -319,8 +319,8 @@ class LearnableAnisotropicObject(Object):
         '''
         sm_activations: (permitivity_shape, H, W)
         '''
-        sm_activations = torch.reshape(sm_activations, (1, 3, 3, self.Nx, self.Ny))
-        self.sm_activations = torch.permute(sm_activations, (3, 4, 0, 1, 2))
+        sm_activations = torch.reshape(sm_activations, (3, 3, self.Nx, self.Ny, self.Nz))
+        self.sm_activations = torch.permute(sm_activations, (2, 3, 4, 0, 1))
 
     def update_E(self, curl_H):
         """custom update equations for inside the anisotropic object
@@ -351,7 +351,6 @@ class LearnableAnisotropicObject(Object):
             nonlin_modifier = self.sm_activations
         else:
             nonlin_modifier = torch.tensor([1.0], device=self.device)
-        
         
         self.grid.E[loc] += bd.reshape(
             self.grid.courant_number

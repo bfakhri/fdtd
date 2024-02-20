@@ -106,6 +106,8 @@ class PointSource:
         # if not pulse
         else:
             src = self.amplitude * sin(2 * pi * q / self.period + self.phase_shift)
+        print('lwkjeflwkejf: ', self.x, self.y, self.z)
+        print('lkwjelfkjwef2', self.grid.E.shape)
         self.grid.E[self.x, self.y, self.z, 2] += src
 
     def update_H(self):
@@ -225,6 +227,7 @@ class LineSource:
                 )
 
         self.x, self.y, self.z = self._handle_slices(x, y, z)
+        print('hs: ', self.x, self.y, self.z)
 
         self.period = grid._handle_time(self.period)
 
@@ -330,6 +333,8 @@ class LineSource:
         # do not use list indexing here, as this is much slower especially for torch backend
         # DISABLED: self.grid.E[self.x, self.y, self.z, 2] = vect
         for x, y, z, value in zip(self.x, self.y, self.z, vect):
+            print('lwkjeflwkejf: ', x, y, z)
+            print('lkwjelfkjwef2', self.grid.E.shape)
             self.grid.E[x, y, z, 2] += value
 
     def update_H(self):
