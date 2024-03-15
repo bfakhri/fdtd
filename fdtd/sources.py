@@ -35,6 +35,7 @@ class PointSource:
         pulse: bool = False,
         cycle: int = 5,
         hanning_dt: float = 10.0,
+        delay: float = 0,
     ):
         """Create a LineSource with a gaussian profile
 
@@ -47,6 +48,7 @@ class PointSource:
             pulse: Set True to use a Hanning window pulse instead of continuous wavefunction.
             cycle: cycles for Hanning window pulse.
             hanning_dt: timestep used for Hanning window pulse width (optional).
+            delay: the number of time steps wait before firing up the source.
 
         """
         self.grid = None
@@ -58,6 +60,8 @@ class PointSource:
         self.cycle = cycle
         self.frequency = 1.0 / period
         self.hanning_dt = hanning_dt if hanning_dt is not None else 0.5 / self.frequency
+        self.delay = delay
+        print('self.delay: ', self.delay, '\tself.period: ', self.period)
 
     def _register_grid(self, grid: Grid, x: Number, y: Number, z: Number):
         """Register a grid for the source.
@@ -94,8 +98,15 @@ class PointSource:
         """Add the source to the electric field"""
         q = self.grid.time_steps_passed
         # if pulse
+        print(q, self.period, self.delay)
+        print('(q / self.period) < self.delay)')
+        if(q  < self.delay):
+            return
         if self.pulse:
             t1 = int(2 * pi / (self.frequency * self.hanning_dt / self.cycle))
+            print('self.pulse, self.cycle, self.frequency, self.hanning_dt')
+            print(self.pulse, self.cycle, self.frequency, self.hanning_dt)
+            print('q: ', q, '\tt1: ', t1)
             if q < t1:
                 src = self.amplitude * hanning(
                     self.frequency, q * self.hanning_dt, self.cycle
@@ -105,7 +116,7 @@ class PointSource:
                 src = 0
         # if not pulse
         else:
-            src = self.amplitude * sin(2 * pi * q / self.period + self.phase_shift)
+            src = self.amplitude * sin(2 * pi * (q - self.delay) / self.period + self.phase_shift)
         self.grid.E[self.x, self.y, self.z, 2] += src
 
     def update_H(self):

@@ -44,6 +44,7 @@ def visualize(
     index=None,  # index for each frame of animation (visualize fn runs in a loop, loop variable is passed as index)
     save=False,  # True to save frames (requires parameters index, folder)
     folder=None,  # folder path to save frames
+    clean_img=True,  # if set will not add axes and legend to plot
 ):
     """visualize a projection of the grid and the optical energy inside the grid
 
@@ -337,7 +338,7 @@ def visualize(
     else:
         # Blue is electric field, green is magnetic field.
         grid_color[..., 2], mask_E = visnorm(grid_energy_E)
-        grid_color[..., 0], mask_H = visnorm(grid_energy_H)
+        grid_color[..., 1], mask_H = visnorm(grid_energy_H)
         #mask = mask_E*mask_H
         mask = ((grid_energy_E + grid_energy_H) > 1e-6)
     
@@ -347,20 +348,26 @@ def visualize(
     plt.imshow(bd.numpy(grid_color.detach()), interpolation="sinc")
 
     # finalize the plot
-    plt.ylabel(xlabel)
-    plt.xlabel(ylabel)
-    plt.ylim(Nx, -1)
-    plt.xlim(-1, Ny)
-    plt.figlegend()
+    if(clean_img):
+        plt.axis('off')
+    else:
+        plt.ylabel(xlabel)
+        plt.xlabel(ylabel)
+        plt.ylim(Nx, -1)
+        plt.xlim(-1, Ny)
+        plt.figlegend()
     plt.tight_layout()
 
     # save frame (require folder path and index)
     if save:
-        plt.savefig(os.path.join(folder, f"file{str(index).zfill(4)}.png"))
+        plt.savefig(os.path.join(folder, f"file{str(index).zfill(4)}.png"), bbox_inches='tight')
+
 
     # show if not animating
     if show:
         plt.show()
+
+    return grid_energy_E, grid_energy_H
 
 
 def dB_map_2D(block_det=None, choose_axis=2, interpolation="spline16"):
