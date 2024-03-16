@@ -61,7 +61,6 @@ class PointSource:
         self.frequency = 1.0 / period
         self.hanning_dt = hanning_dt if hanning_dt is not None else 0.5 / self.frequency
         self.delay = delay
-        print('self.delay: ', self.delay, '\tself.period: ', self.period)
 
     def _register_grid(self, grid: Grid, x: Number, y: Number, z: Number):
         """Register a grid for the source.
@@ -98,8 +97,6 @@ class PointSource:
         """Add the source to the electric field"""
         q = self.grid.time_steps_passed
         # if pulse
-        print(q, self.period, self.delay)
-        print('(q / self.period) < self.delay)')
         if(q  < self.delay):
             return
         if self.pulse:
