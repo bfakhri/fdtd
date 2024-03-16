@@ -133,6 +133,8 @@ class Grid:
         # save electric and magnetic field
         self.E = bd.zeros((self.Nx, self.Ny, self.Nz, 3))
         self.H = bd.zeros((self.Nx, self.Ny, self.Nz, 3))
+        self.E_avg = bd.zeros((self.Nx, self.Ny, self.Nz, 3))
+        self.H_avg = bd.zeros((self.Nx, self.Ny, self.Nz, 3))
 
         # save the inverse of the relative permittiviy and the relative permeability
         # these tensors can be anisotropic!
@@ -269,6 +271,8 @@ class Grid:
         """
         self.update_E()
         self.update_H()
+        self.E_avg += self.E
+        self.H_avg += self.H
         self.time_steps_passed += 1
 
     def update_E(self):
