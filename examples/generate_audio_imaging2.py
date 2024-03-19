@@ -13,7 +13,7 @@ fdtd.set_backend("torch")
 
 # ## Constants
 WAVELENGTH = 1550e-9
-WAVELENGTH2 = 8*1550e-9
+WAVELENGTH2 = 4*1550e-9
 SPEED_LIGHT: float = 299_792_458.0  # [m/s] speed of light
 
 def NormalizeEnergy(energy, width=3):
@@ -24,7 +24,7 @@ def NormalizeEnergy(energy, width=3):
     return energy_normed
 
 #for shift in range(0, 143, 1):
-period_steps = 114
+period_steps = 90
 major_step = 0
 directions = [(-1.0, 0.0), (1.0, 0.0), (0.0, -1.0), (0.0, 1.0)]
 l_delay = period_steps//2
