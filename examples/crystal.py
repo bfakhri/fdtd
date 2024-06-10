@@ -19,11 +19,9 @@ WAVELENGTH = 1550e-9 # For resolution purposes.
 SPEED_LIGHT: float = 299_792_458.0  # [m/s] speed of light
 
 # Frequency of the brainwaves.
-#BRAIN_FREQ = 340000000000.0 # Hz
-#BRAIN_FREQ = 3400000000000.0 # Hz
+#BRAIN_FREQ = 2*34000000000000.0 # Hz
+#BRAIN_FREQ = 6*34000000000000.0 # Hz
 BRAIN_FREQ = 34000000000000.0 # Hz
-#BRAIN_FREQ = 3400000000000000.0 # Hz
-#BRAIN_FREQ = 3400000000.0 # Hz
 
 
 # ## Simulation
@@ -52,13 +50,13 @@ print('Grid Shape: ', grid.shape)
 # In[5]:
 
 
-## grid[0, :, :] = fdtd.PeriodicBoundary(name="xbounds")
-#grid[0:10, :, :] = fdtd.PML(name="pml_xlow")
-#grid[-10:, :, :] = fdtd.PML(name="pml_xhigh")
-#
-## grid[:, 0, :] = fdtd.PeriodicBoundary(name="ybounds")
-#grid[:, 0:10, :] = fdtd.PML(name="pml_ylow")
-#grid[:, -10:, :] = fdtd.PML(name="pml_yhigh")
+# grid[0, :, :] = fdtd.PeriodicBoundary(name="xbounds")
+grid[0:10, :, :] = fdtd.PML(name="pml_xlow")
+grid[-10:, :, :] = fdtd.PML(name="pml_xhigh")
+
+# grid[:, 0, :] = fdtd.PeriodicBoundary(name="ybounds")
+grid[:, 0:10, :] = fdtd.PML(name="pml_ylow")
+grid[:, -10:, :] = fdtd.PML(name="pml_yhigh")
 
 grid[:, :, 0] = fdtd.PeriodicBoundary(name="zbounds")
 
@@ -67,18 +65,18 @@ grid[:, :, 0] = fdtd.PeriodicBoundary(name="zbounds")
 xe = grid.shape[0] - 10
 ye = grid.shape[1] - 10
 
-grid[ 10, 10:xe, 0] = fdtd.LineSource(
-    period=1.0 / BRAIN_FREQ, name="linesource0"
-)
-grid[ye-1, 10:xe, 0] = fdtd.LineSource(
-    period=1.0 / BRAIN_FREQ, name="linesource1"
-)
+#grid[ 10, 10:xe, 0] = fdtd.LineSource(
+#    period=1.0 / BRAIN_FREQ, name="linesource0"
+#)
+#grid[ye-1, 10:xe, 0] = fdtd.LineSource(
+#    period=1.0 / BRAIN_FREQ, name="linesource1"
+#)
 grid[ 10:ye, 10, 0] = fdtd.LineSource(
     period=1.0 / BRAIN_FREQ, name="linesource2"
 )
-grid[10:ye, xe-1, 0] = fdtd.LineSource(
-    period=1.0 / BRAIN_FREQ, name="linesource3"
-)
+#grid[10:ye, xe-1, 0] = fdtd.LineSource(
+#    period=1.0 / BRAIN_FREQ, name="linesource3"
+#)
 
 
 # detectors
@@ -114,7 +112,7 @@ print(grid.objects[0].inverse_permittivity.shape)
 yl, xl = grid.objects[0].Ny, grid.objects[0].Nx
 
 # Import the image
-image = Image.open('rabbit.jpg')
+image = Image.open('sinusoidal_grating_f4.jpg')
 image = image.resize((yl, xl))
 
 print(image.format)
@@ -129,14 +127,12 @@ input('klj')
 
 #iimg = torch.ones(9, yl, xl)
 #iimg = torch.ones(9, yl, xl) * 100
-iimg = torch.from_numpy(image) * 100 + 1
+#iimg = torch.from_numpy(image) * 100 + 1
+iimg = torch.from_numpy(image) * 1 + 1
 print(iimg)
 #iimg[:, midpoint_y:midpoint_y + size, midpoint_x:midpoint_x + size] = 10
 grid.objects[0].seed(1.0/iimg)
 
-# grid[midpoint_y, midpoint_x, 0] = fdtd.PointSource(
-#     period=WAVELENGTH2 / SPEED_LIGHT, amplitude=0.001, name="pointsource0"
-# )
 
 # ## Run simulation
 
@@ -146,14 +142,11 @@ torch.set_grad_enabled(False)
 
 
 grid.visualize(z=0, animate=True, norm="log")
-#vis_steps = 20
-vis_steps = 15
+vis_steps = 40
 step = 0
 for i in range(1000000):
     grid.run(vis_steps, progress_bar=False)
-    #grid.visualize(z=0, norm='log', animate=True)
-    #grid.visualize(z=0, norm='log', animate=True, objcolor=(0, 0, 0, 0), objedgecolor=(1,1,1,1), plot_both_fields=False, save=True, folder='./sim_frames/', index=i)
-    grid.visualize(z=0, norm='log', animate=True, objcolor=(0, 0, 0, 0), objedgecolor=(1,1,1,0), plot_both_fields=False, save=True, folder='./sim_frames/', index=i, clean_img=True)
+    grid.visualize(z=0, norm='log', animate=True, objcolor=(0, 0, 0, 0), objedgecolor=(1,1,1,0), plot_both_fields=False, save=False, folder='./sim_frames/', index=i, clean_img=True)
     plt.show()
     step += vis_steps
     print('On step: ', step)

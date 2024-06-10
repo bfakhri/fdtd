@@ -21,7 +21,8 @@ SPEED_LIGHT: float = 299_792_458.0  # [m/s] speed of light
 # Frequency of the brainwaves.
 #BRAIN_FREQ = 340000000000.0 # Hz
 #BRAIN_FREQ = 3400000000000.0 # Hz
-BRAIN_FREQ = 34000000000000.0 # Hz
+BRAIN_FREQ = 4*34000000000000.0 # Hz
+#BRAIN_FREQ = 340000000000000.0 # Hz
 #BRAIN_FREQ = 3400000000000000.0 # Hz
 #BRAIN_FREQ = 3400000000.0 # Hz
 
@@ -52,13 +53,13 @@ print('Grid Shape: ', grid.shape)
 # In[5]:
 
 
-## grid[0, :, :] = fdtd.PeriodicBoundary(name="xbounds")
-#grid[0:10, :, :] = fdtd.PML(name="pml_xlow")
-#grid[-10:, :, :] = fdtd.PML(name="pml_xhigh")
-#
-## grid[:, 0, :] = fdtd.PeriodicBoundary(name="ybounds")
-#grid[:, 0:10, :] = fdtd.PML(name="pml_ylow")
-#grid[:, -10:, :] = fdtd.PML(name="pml_yhigh")
+# grid[0, :, :] = fdtd.PeriodicBoundary(name="xbounds")
+grid[0:10, :, :] = fdtd.PML(name="pml_xlow")
+grid[-20:, :, :] = fdtd.PML(name="pml_xhigh")
+
+# grid[:, 0, :] = fdtd.PeriodicBoundary(name="ybounds")
+grid[:, 0:10, :] = fdtd.PML(name="pml_ylow")
+grid[:, -10:, :] = fdtd.PML(name="pml_yhigh")
 
 grid[:, :, 0] = fdtd.PeriodicBoundary(name="zbounds")
 
@@ -67,18 +68,12 @@ grid[:, :, 0] = fdtd.PeriodicBoundary(name="zbounds")
 xe = grid.shape[0] - 10
 ye = grid.shape[1] - 10
 
-grid[ 10, 10:xe, 0] = fdtd.LineSource(
-    period=1.0 / BRAIN_FREQ, name="linesource0"
-)
-grid[ye-1, 10:xe, 0] = fdtd.LineSource(
-    period=1.0 / BRAIN_FREQ, name="linesource1"
-)
-grid[ 10:ye, 10, 0] = fdtd.LineSource(
-    period=1.0 / BRAIN_FREQ, name="linesource2"
-)
-grid[10:ye, xe-1, 0] = fdtd.LineSource(
-    period=1.0 / BRAIN_FREQ, name="linesource3"
-)
+#grid[10, :, 0] = fdtd.LineSource(
+#    period=10.0 / BRAIN_FREQ, name="linesource0"
+#)
+#grid[-21, :, 0] = fdtd.LineSource(
+#    period=10.0 / BRAIN_FREQ, name="linesource0"
+#)
 
 
 # detectors
@@ -91,30 +86,20 @@ grid[10:ye, xe-1, 0] = fdtd.LineSource(
 midpoint_y = grid.shape[0]//2
 midpoint_x = grid.shape[1]//2
 size = 20
-#grid[ midpoint_y, midpoint_x, 0] = fdtd.PointSource(
-#    period=1.0 / BRAIN_FREQ, name="pointsource", amplitude=0.01,
-#    pulse=True, hanning_dt= 1.0/BRAIN_FREQ
-#)
-#grid[ size + 10, size+10, 0] = fdtd.PointSource(
-#    period=1.0 / BRAIN_FREQ, name="pointsource",
-#    pulse=True#, hanning_dt= 10.0/BRAIN_FREQ
-#)
-#grid[ size + 10, -size+10, 0] = fdtd.PointSource(
-#    period=1.0 / BRAIN_FREQ, name="pointsource2"
-#)
-#grid[ midpoint_y, midpoint_x, 0] = fdtd.PointSource(
-#    period=1.0 / BRAIN_FREQ, name="pointsource"
-#)
+grid[ midpoint_y+100, midpoint_x-7, 0] = fdtd.PointSource(
+    period=10.0 / BRAIN_FREQ, name="pointsource", amplitude=0.0005,
+)
 
 
-grid[40:-40, 40:-40, :] = fdtd.LearnableAnisotropicObject(permittivity=1.0, is_substrate=False, name="cc_substrate")
+grid[10:-10, 10:-10, :] = fdtd.LearnableAnisotropicObject(permittivity=1.0, is_substrate=False, name="cc_substrate")
 conv = torch.nn.Conv2d( 2, 3*3, kernel_size=1, stride=1, padding='same')
 #grid.objects[0].nonlin_conv = lambda x : torch.ones_like(conv(x))
 print(grid.objects[0].inverse_permittivity.shape)
 yl, xl = grid.objects[0].Ny, grid.objects[0].Nx
 
 # Import the image
-image = Image.open('rabbit.jpg')
+image = Image.open('head_and_ears_self_round.jpg')
+print('minmax: ', np.min(image), np.max(image))
 image = image.resize((yl, xl))
 
 print(image.format)
@@ -125,7 +110,7 @@ image = np.asarray(image).astype(np.float32) / 255.0
 image = np.stack([image]*9, axis=0)
 print(image.shape)
 print('minmax: ', np.min(image), np.max(image))
-input('klj')
+#input('klj')
 
 #iimg = torch.ones(9, yl, xl)
 #iimg = torch.ones(9, yl, xl) * 100
@@ -134,9 +119,6 @@ print(iimg)
 #iimg[:, midpoint_y:midpoint_y + size, midpoint_x:midpoint_x + size] = 10
 grid.objects[0].seed(1.0/iimg)
 
-# grid[midpoint_y, midpoint_x, 0] = fdtd.PointSource(
-#     period=WAVELENGTH2 / SPEED_LIGHT, amplitude=0.001, name="pointsource0"
-# )
 
 # ## Run simulation
 
@@ -147,7 +129,7 @@ torch.set_grad_enabled(False)
 
 grid.visualize(z=0, animate=True, norm="log")
 #vis_steps = 20
-vis_steps = 15
+vis_steps = 4
 step = 0
 for i in range(1000000):
     grid.run(vis_steps, progress_bar=False)
