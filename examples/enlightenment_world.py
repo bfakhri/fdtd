@@ -20,8 +20,9 @@ SPEED_LIGHT: float = 299_792_458.0  # [m/s] speed of light
 
 # Frequency of the brainwaves.
 #BRAIN_FREQ = 340000000000.0 # Hz
-#BRAIN_FREQ = 3400000000000.0 # Hz
-BRAIN_FREQ = 34000000000000.0 # Hz
+#BRAIN_FREQ = 5*340000000000.0 # Hz
+BRAIN_FREQ = 3400000000000.0 # Hz
+#BRAIN_FREQ = 34000000000000.0 # Hz
 #BRAIN_FREQ = 340000000000000.0 # Hz
 #BRAIN_FREQ = 3400000000000000.0 # Hz
 #BRAIN_FREQ = 3400000000.0 # Hz
@@ -68,19 +69,20 @@ grid[:, :, 0] = fdtd.PeriodicBoundary(name="zbounds")
 # sources
 xe = grid.shape[0] - 10
 ye = grid.shape[1] - 10
+bb = 50
 
-#grid[ 10, 10:xe, 0] = fdtd.LineSource(
+#grid[ bb, bb:xe, 0] = fdtd.LineSource(
 #    period=1.0 / BRAIN_FREQ, name="linesource0"
 #)
-#grid[ye-1, 10:xe, 0] = fdtd.LineSource(
+#grid[ye-bb, bb:xe, 0] = fdtd.LineSource(
 #    period=1.0 / BRAIN_FREQ, name="linesource1"
 #)
-#grid[ 10:ye, 10, 0] = fdtd.LineSource(
+#grid[ bb:ye, bb, 0] = fdtd.LineSource(
 #    period=1.0 / BRAIN_FREQ, name="linesource2"
 #)
-#grid[10:ye, xe-1, 0] = fdtd.LineSource(
-#    period=1.0 / BRAIN_FREQ, name="linesource3"
-#)
+grid[bb:ye, xe-bb, 0] = fdtd.LineSource(
+    period=1.0 / BRAIN_FREQ, name="linesource3"
+)
 
 
 # detectors
@@ -93,9 +95,9 @@ ye = grid.shape[1] - 10
 midpoint_y = grid.shape[0]//2
 midpoint_x = grid.shape[1]//2
 size = 20
-grid[ midpoint_y+0, midpoint_x+70, 0] = fdtd.PointSource(
-    period=10.0 / BRAIN_FREQ, name="pointsource", amplitude=0.0005,
-)
+#grid[ midpoint_y+0, midpoint_x+70, 0] = fdtd.PointSource(
+#    period=1.0 / BRAIN_FREQ, name="pointsource", amplitude=1.0,
+#)
 
 
 grid[40:-40, 40:-40, :] = fdtd.LearnableAnisotropicObject(permittivity=1.0, is_substrate=False, name="cc_substrate")
@@ -105,7 +107,7 @@ print(grid.objects[0].inverse_permittivity.shape)
 yl, xl = grid.objects[0].Ny, grid.objects[0].Nx
 
 # Import the image
-image = Image.open('enlightenment_mask.png')
+image = Image.open('enlightenment_world2.png')
 image = image.resize((yl, xl))
 
 print(image.format)
@@ -142,7 +144,7 @@ vis_steps = 150
 step = 0
 for i in range(1000000):
     grid.run(vis_steps, progress_bar=False)
-    grid.visualize(z=0, norm='log', animate=True, objcolor=(0, 0, 0, 0), objedgecolor=(1,1,1,0), plot_both_fields=False, save=True, folder='./sim_frames_enlight/', index=i, clean_img=True)
+    grid.visualize(z=0, norm='log', animate=True, objcolor=(0, 0, 0, 0), objedgecolor=(1,1,1,0), plot_both_fields=False, save=True, folder='./sim_frames_enlight_world7/', index=i, clean_img=True)
     #grid.visualize(z=0, norm='log', animate=True, objcolor=(0, 0, 0, 0), objedgecolor=(1,1,1,0), plot_both_fields=False, save=False, folder='./sim_frames/', index=i, clean_img=True)
     plt.show()
     step += vis_steps
