@@ -79,6 +79,8 @@ def visualize(
         _PMLZlow,
         _PMLZhigh,
     )
+    import matplotlib.pyplot as plt
+    import matplotlib.patches as ptc
 
     # Handle figure and axes creation for animation or single plots
     if animate:
@@ -185,7 +187,7 @@ def visualize(
         max_vals_for_norm = grid._animation_state['max_vals']
     else:
         # For a single plot, normalize by the max of the current data.
-        max_vals_for_norm = [bd.max(bd.abs(d)) for d in datasets]
+        max_vals_for_norm = [bd.max(bd.abs(d)).item() for d in datasets]
 
 
     def _plot_slice(ax, data_slice, title, max_val_so_far):
@@ -201,7 +203,8 @@ def visualize(
                 elif y is not None: _x, _y = source.z, source.y
                 elif z is not None: _x, _y = source.x, source.y
                 ax.plot(_y - 0.5, _x - 0.5, lw=3, marker="o", color=srccolor)
-                data_slice[_x, _y] = 0
+                if 0 <= _x < data_slice.shape[0] and 0 <= _y < data_slice.shape[1]:
+                    data_slice[_x, _y] = 0
             elif isinstance(source, PlaneSource):
                 if x is not None:
                     _x = source.y if source.y.stop > source.y.start + 1 else slice(source.y.start, source.y.start)
@@ -250,12 +253,17 @@ def visualize(
         grid_color = bd.zeros((data_slice.shape) + (4,))
         normalized_slice = visnorm(data_slice)
         
-        # Use the blue channel for intensity
+        # Use the blue and green channel for intensity
+        grid_color[..., 1] = normalized_slice
         grid_color[..., 2] = normalized_slice
         # Set alpha channel
         grid_color[..., -1] = 0.5
         ax.imshow(bd.numpy(grid_color.detach()), interpolation="sinc")
 
+        # Create the new title string including the max value
+        full_title = f"{title}\nMax: {max_val_so_far:.2e}"
+        ax.set_title(full_title)
+        
         if clean_img:
             ax.axis('off')
         else:
@@ -263,7 +271,7 @@ def visualize(
             ax.set_xlabel(ylabel)
             ax.set_ylim(Nx, -1)
             ax.set_xlim(-1, Ny)
-        ax.set_title(title)
+
 
     titles = ["grid_energy_E", "grid.E_pow_avg", "grid.E_avg"]
     for i, (ax, data_slice, title) in enumerate(zip(axes, datasets, titles)):
@@ -286,6 +294,8 @@ def visualize(
         plt.show()
 
     return datasets
+
+
 def dB_map_2D(block_det=None, choose_axis=2, interpolation="spline16"):
     """
     Displays detector readings from an 'fdtd.BlockDetector' in a decibel map spanning a 2D slice region inside the BlockDetector.

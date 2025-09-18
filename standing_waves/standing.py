@@ -32,10 +32,12 @@ grid[10, :] = fdtd.LineSource(period=period, name="source")
 
 # x boundaries
 # grid[0, :, :] = fdtd.PeriodicBoundary(name="xbounds")
+#grid[0:10, :, :] = fdtd.PML(name="pml_xlow")
 grid[0:10, :, :] = fdtd.PML(name="pml_xlow")
+#grid[0:10:, :, :] = fdtd.Object(permittivity=1000, name="hard_boundary1")
 #grid[-10:, :, :] = fdtd.PML(name="pml_xhigh")
 #grid[0:10, :, :] = fdtd.Object(permittivity=100, name="pml_xlow")
-grid[-10:, :, :] = fdtd.Object(permittivity=1000, name="hard_boundary")
+grid[-10:, :, :] = fdtd.Object(permittivity=1000, name="hard_boundary2")
 
 # y boundaries
 # grid[:, 0, :] = fdtd.PeriodicBoundary(name="ybounds")
@@ -43,7 +45,7 @@ grid[:, 0:10, :] = fdtd.PML(name="pml_ylow")
 grid[:, -10:, :] = fdtd.PML(name="pml_yhigh")
 
 for i in range(1000):
-    grid.run(10, progress_bar=False)
+    grid.run(1, progress_bar=False)
     grid.visualize(z=0, animate=True, norm="log", plot_grid_avg=False, plot_both_fields=True)
     #grid.visualize(z=0, animate=True, plot_grid_avg=True)
     #grid.visualize(z=0, animate=True, norm="log", plot_grid_pow_avg=True)
