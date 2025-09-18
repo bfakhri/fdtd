@@ -85,7 +85,9 @@ def visualize(
         if not hasattr(grid, '_animation_state'):
             # First frame setup
             fig, axes = plt.subplots(1, 3, figsize=(18, 6))
-            grid._animation_state = {'fig': fig, 'axes': axes}
+            # Initialize max values for each of the three plots
+            max_vals = [0.0, 0.0, 0.0]
+            grid._animation_state = {'fig': fig, 'axes': axes, 'max_vals': max_vals}
             plt.ion()
         else:
             # Subsequent frames: retrieve figure and axes, then clear them
@@ -136,7 +138,7 @@ def visualize(
     grid_energy_E = bd.sum(grid.E ** 2, -1)
     grid_energy_E_pow_avg = grid.E_pow_avg
     grid_energy_E_avg = bd.sum(grid.E_avg ** 2, -1)
-
+    
     # Slicing logic
     if x is not None:
         assert grid.Ny > 1 and grid.Nz > 1
@@ -173,8 +175,20 @@ def visualize(
         ]
     else:
         raise ValueError("Visualization only works for 2D grids")
+    
+    # Determine normalization values
+    if animate:
+        for i, data in enumerate(datasets):
+            current_max = bd.max(bd.abs(data))
+            if current_max > grid._animation_state['max_vals'][i]:
+                grid._animation_state['max_vals'][i] = current_max.item()
+        max_vals_for_norm = grid._animation_state['max_vals']
+    else:
+        # For a single plot, normalize by the max of the current data.
+        max_vals_for_norm = [bd.max(bd.abs(d)) for d in datasets]
 
-    def _plot_slice(ax, data_slice, title):
+
+    def _plot_slice(ax, data_slice, title, max_val_so_far):
         # Helper function to plot a single data slice on a given axis
         for source in grid.sources:
             if isinstance(source, LineSource):
@@ -225,21 +239,24 @@ def visualize(
             patch = ptc.Rectangle(xy=(min(_y) - 0.5, min(_x) - 0.5), width=max(_y) - min(_y), height=max(_x) - min(_x), linewidth=1, edgecolor=objedgecolor, facecolor=objcolor)
             ax.add_patch(patch)
 
-        def visnorm(x, width=1):
-            mean, sigma = x.mean(), x.std()
-            z = (x-mean)/sigma if sigma > 1e-9 else x - mean
-            z_map = (z + width)/(2*width)
-            mask = (z_map > 0)
-            z_map = z_map*mask
-            z_map = z_map*(z_map < 1) + (z_map > 1)
-            return z_map, mask
+        def visnorm(data):
+            """Normalize the data based on the largest absolute value encountered thus far."""
+            # Use a small epsilon to avoid division by zero
+            max_val = max(max_val_so_far, 1e-9)
+            normalized_data = data / max_val
+            # Clip to handle potential floating point inaccuracies
+            return bd.clip(normalized_data, 0, 1)
 
-        grid_color = bd.zeros((data_slice.shape)+(4,))
-        grid_color[..., 2], mask = visnorm(data_slice)
-        grid_color[...,-1] = 0.5
+        grid_color = bd.zeros((data_slice.shape) + (4,))
+        normalized_slice = visnorm(data_slice)
+        
+        # Use the blue channel for intensity
+        grid_color[..., 2] = normalized_slice
+        # Set alpha channel
+        grid_color[..., -1] = 0.5
         ax.imshow(bd.numpy(grid_color.detach()), interpolation="sinc")
 
-        if(clean_img):
+        if clean_img:
             ax.axis('off')
         else:
             ax.set_ylabel(xlabel)
@@ -249,13 +266,13 @@ def visualize(
         ax.set_title(title)
 
     titles = ["grid_energy_E", "grid.E_pow_avg", "grid.E_avg"]
-    for ax, data_slice, title in zip(axes, datasets, titles):
-        _plot_slice(ax, data_slice, title)
+    for i, (ax, data_slice, title) in enumerate(zip(axes, datasets, titles)):
+        _plot_slice(ax, data_slice, title, max_vals_for_norm[i])
 
     # Finalize plot
     if not clean_img:
         fig.figlegend(loc='upper center', ncol=5, bbox_to_anchor=(0.5, 0.95))
-
+    
     plt.tight_layout(rect=[0, 0, 1, 0.9]) # Adjust layout to make room for legend
 
     if animate:
@@ -269,8 +286,6 @@ def visualize(
         plt.show()
 
     return datasets
-
-
 def dB_map_2D(block_det=None, choose_axis=2, interpolation="spline16"):
     """
     Displays detector readings from an 'fdtd.BlockDetector' in a decibel map spanning a 2D slice region inside the BlockDetector.
