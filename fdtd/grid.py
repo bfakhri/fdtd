@@ -135,6 +135,8 @@ class Grid:
         self.H = bd.zeros((self.Nx, self.Ny, self.Nz, 3))
         self.E_avg = bd.zeros((self.Nx, self.Ny, self.Nz, 3))
         self.H_avg = bd.zeros((self.Nx, self.Ny, self.Nz, 3))
+        self.E_pow_avg = bd.zeros((self.Nx, self.Ny, self.Nz))
+        self.H_pow_avg = bd.zeros((self.Nx, self.Ny, self.Nz))
 
         # save the inverse of the relative permittiviy and the relative permeability
         # these tensors can be anisotropic!
@@ -273,6 +275,8 @@ class Grid:
         self.update_H()
         self.E_avg += self.E
         self.H_avg += self.H
+        self.E_pow_avg += bd.sum(self.E ** 2, -1)
+        self.H_pow_avg += bd.sum(self.H ** 2, -1)
         self.time_steps_passed += 1
 
     def update_E(self):

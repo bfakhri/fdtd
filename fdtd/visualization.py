@@ -45,6 +45,8 @@ def visualize(
     save=False,  # True to save frames (requires parameters index, folder)
     folder=None,  # folder path to save frames
     clean_img=True,  # if set will not add axes and legend to plot
+    plot_grid_avg=False, # if set uses self.E_avg and self.H_avg instead of E and H
+    plot_grid_pow_avg=False, # if set uses self.E_pow_avg and self.H_pow_avg instead of E and H
 ):
     """visualize a projection of the grid and the optical energy inside the grid
 
@@ -119,9 +121,15 @@ def visualize(
     plt.plot([], lw=3, color=detcolor, label="Detectors")
 
     # Grid energy
-    #grid_energy = bd.sum(grid.E ** 2 + grid.H ** 2, -1)
-    grid_energy_E = bd.sum(grid.E ** 2, -1)
-    grid_energy_H = bd.sum(grid.H ** 2, -1)
+    if(plot_grid_avg):
+        grid_energy_E = bd.sum(grid.E_avg ** 2, -1)
+        grid_energy_H = bd.sum(grid.H_avg ** 2, -1)
+    elif(plot_grid_pow_avg):
+        grid_energy_E = grid.E_pow_avg
+        grid_energy_H = grid.H_pow_avg
+    else:
+        grid_energy_E = bd.sum(grid.E ** 2, -1)
+        grid_energy_H = bd.sum(grid.H ** 2, -1)
     #TODO: remove this print, just for debugging.
     print('Emax: ', bd.max(grid_energy_E))
     print('Hmax: ', bd.max(grid_energy_H))
@@ -333,7 +341,7 @@ def visualize(
         return z_map, mask
 
     grid_color = bd.zeros((grid_energy_E.shape)+(4,))
-    if(plot_both_fields):
+    if(not plot_both_fields):
         grid_color[..., 2], mask = visnorm(grid_energy_E + grid_energy_H)
     else:
         # Blue is electric field, green is magnetic field.
