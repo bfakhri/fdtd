@@ -222,6 +222,12 @@ if TORCH_AVAILABLE:
         max = staticmethod(torch.max)
         """ max element in array """
 
+        abs = staticmethod(torch.abs)
+        """ absolute value """
+
+        clip = staticmethod(torch.clip)
+        """ clip value """
+
         stack = staticmethod(torch.stack)
         """ stack multiple arrays """
 
